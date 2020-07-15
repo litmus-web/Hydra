@@ -58,6 +58,6 @@ web_1  | Requests/sec:   2337.10
 web_1  | Transfer/sec:     19.83MB
 ```
 
-An interesting note about these benchmarks is that altho Uvicorn by requests/sec Sandman is much more stable with handling many connections at once with 0 timeouts or errors compared to Uvicorns's 87 timeouts and higher avg and max latency
+An interesting note about these benchmarks is that altho Uvicorn wins by requests/sec Sandman is much more stable with handling many connections at once with 0 timeouts or errors compared to Uvicorns's 87 timeouts and higher avg and max latency
 
 Uvicorn also uses the Uvloop event protocol while Sandman is running on pure asyncio Python *not* Uvloop which would also benifit Sandman.
