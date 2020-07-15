@@ -1,15 +1,19 @@
 use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncWriteExt, AsyncReadExt};
-use std::error::Error;
-use std::sync::{
-    Arc
-};
-use futures::{StreamExt};
-use warp::{Filter};
 use tokio::sync::RwLock;
+
+use futures::{StreamExt};
+
+use warp::{Filter};
+
+use std::error::Error;
+use std::sync::Arc;
+use std::collections::HashMap;
 
 type Workers = Arc<RwLock<Vec<TcpStream>>>;
 type Count = Arc<RwLock<usize>>;
+type Cache = Arc<RwLock<HashMap<String, String>>>;
+
 
 
 #[tokio::main]
@@ -23,10 +27,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let counter_lock = Count::default();
     let counter_clone = counter_lock.clone();
 
+    let cache_lock = Cache::default();
+    let cache_clone = cache_lock.clone();
+
     let counter_clone = warp::any().map(move || counter_clone.clone());
     let workers_clone = warp::any().map(move || workers_clone.clone());
+    let cache_clone = warp::any().map(move || cache_clone.clone());
 
-    let routes = warp::path("bob").and(workers_clone.clone()).and(counter_clone.clone()).and_then(test);
+    let routes = warp::path::end()
+        .and(warp::header("user-agent"))
+        .and(workers_clone.clone())
+        .and(counter_clone.clone())
+        .and(cache_clone.clone())
+        .and_then(test);
 
     let server = async move {
         let mut incoming = listener.incoming();
@@ -57,34 +70,46 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn test(workers: Workers, counter: Count) -> Result<impl warp::Reply, warp::Rejection> {
-    let content  = get_resp(workers, counter, b"hello world--eof--").await;
+async fn test(agent: String, workers: Workers, counter: Count, cache: Cache) -> Result<impl warp::Reply, warp::Rejection> {
+    let content  = get_resp(workers, counter, b"hello world--eof--", agent, cache).await;
     match content {
-        Ok(val) => Ok(val),
-        _ => Ok("Oops! The server has got itself into trouble.".to_owned())
+        Ok(val) => Ok(warp::reply::html(val)),
+        _ =>  {
+            Ok(warp::reply::html("Oops! and error has ucoured.".to_owned()))
+        }
     }    
 }
 
-async fn get_resp(workers: Workers, counter: Count, content: &'static [u8]) -> Result<String, Box<dyn Error>> {
-    let mut worker_vec = workers.write().await;   
-    let mut count = counter.write().await;     
-    if *count < (worker_vec.len() - 1) {
-        *count += 1;
+async fn get_resp(workers: Workers, counter: Count, content: &'static [u8], agent: String, cache: Cache) -> Result<String, Box<dyn Error>> {
+    if cache.read().await.contains_key(&agent) {
+        match cache.read().await.get(&agent) {
+            Some(v) => Ok((*v).to_string()),
+            None => Ok("No Cache".to_owned()),
+        }        
     } else {
-        *count = 0;
+        let mut worker_vec = workers.write().await;   
+        let mut count = counter.write().await;     
+        if *count < (worker_vec.len() - 1) {
+            *count += 1;
+        } else {
+            *count = 0;
+        }
+        let _ = worker_vec[*count].write_all(content).await;
+        let mut resp = String::new();
+    
+        loop {
+            let mut buf = [0; 1024];
+            let n = worker_vec[*count].read(&mut buf).await?;
+            if n == 0 { break }
+            let temp = String::from_utf8(buf[0..n].to_vec())?;
+            resp = format!("{}{}", resp, temp);
+            if resp.contains("--eom--") {
+                break
+            }
+        }
+        resp = resp.replace("--eom--", "");
+        cache.write().await.insert(agent, resp.clone());
+        Ok(resp)
     }
-    let _ = worker_vec[*count].write_all(content).await;
-    let mut resp = String::new();
-
-    loop {
-        let mut buf = [0; 1024];
-        let n = worker_vec[*count].read(&mut buf).await?;
-        if n == 0 { break }
-        let temp = String::from_utf8(buf[0..n].to_vec())?;
-        resp = format!("{}{}", resp, temp);
-        if resp.contains("--eom--") {
-            break
-         }
-    }
-    Ok(resp)
+    
 }
