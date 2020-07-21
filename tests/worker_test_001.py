@@ -27,8 +27,7 @@ class MySocketClient:
             return True, content.strip("--eof--")
         elif content != "--eof--":
             return False, content.strip("--eof--")
-        else:
-            return True, ""
+        return True, ""
 
     async def _get_resp(self):
         full_content = ""
