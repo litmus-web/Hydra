@@ -1,5 +1,6 @@
 # WARNING! This repo is mearly a test and prototype of a system and is not complete nor production safe.
 
+[![CodeFactor](https://www.codefactor.io/repository/github/project-dream-weaver/sandman/badge/master)](https://www.codefactor.io/repository/github/project-dream-weaver/sandman/overview/master)
 # Sandman
 A experemental Rust to Python hybrid webserver, combining the power of rust and the niceties of python.
 
