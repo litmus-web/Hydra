@@ -12,17 +12,16 @@ Please note the current configuration has the following setup and is purely a pr
 
 ## Currently Working
 [x] - Basic implementation of the Tokio runtime and Warp http<br>
-[x] - Basic load balancing betweeen python workers (I mean *very* basic)<br>
 [x] - Serving sucessful http requests<br>
 
 ## Some of the todo list
 [ ] - Adding proper asgi compatability (or custom system if asgi not possible)<br>
 [ ] - Adding route construction <br>
 [ ] - Better / actual query caching<br>
-[ ] - Fix tokio blocking with RwLock<br>
+[x*] - Fix tokio blocking with RwLock - Sorta? fixed?<br>
 [ ] - Static file serving<br>
 [ ] - Implementing a query system between sockets and workers<br>
-[ ] - Organising incoming worker request (Current system accepts each req as first in first out, which isnt true)<br>
+[x] - Organising incoming worker request (Current system accepts each req as first in first out, which isnt true)<br>
 
 ### That Being said nothing like some benchmarks -- UPDATED
 **Please Note:**
