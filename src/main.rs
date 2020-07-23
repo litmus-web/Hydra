@@ -1,7 +1,8 @@
-use tokio::io::{AsyncWriteExt, AsyncReadExt};
 use tokio::sync::{mpsc, RwLock};
 
 use futures::{FutureExt, StreamExt};
+
+use serde_json::json;
 
 use warp::ws::{Message, WebSocket};
 use warp::Filter;
@@ -18,7 +19,7 @@ type Count = Arc<RwLock<usize>>;
 type Cache = Arc<RwLock<HashMap<String, serde_json::Value>>>;
 
 
-#[tokio::main(max_threads=1)]
+#[tokio::main(max_threads=2)]
 async fn main() -> Result<(), Box<dyn Error>> {
     // Workers RwLock for sending channels
     let workers_lock_send = WorkersSend::default();
@@ -82,10 +83,12 @@ async fn worker_connected(ws: WebSocket, wrk_send: WorkersSend, cache: Cache) {
         let msg = match result {
             Ok(msg) => msg,
             Err(e) => {
+                wrk_send.write().await.remove(&1);
                 eprintln!("websocket connection cloded, reason: {:?}", e);
                 break;
             }
         };
+        
         let msg = if let Ok(s) = msg.to_str() {
             s
         } else {
@@ -98,8 +101,8 @@ async fn worker_connected(ws: WebSocket, wrk_send: WorkersSend, cache: Cache) {
     }
 }
 
-async fn any_path(_path_to_serve: warp::path::FullPath, workers: WorkersSend, cache: Cache) -> Result<impl warp::Reply, warp::Rejection> {
-    let content  = get_resp(workers, cache).await;
+async fn any_path(path_to_serve: warp::path::FullPath, workers: WorkersSend, cache: Cache) -> Result<impl warp::Reply, warp::Rejection> {
+    let content  = get_resp(path_to_serve, workers, cache).await;
     match content {
         Ok(val) => Ok(warp::reply::html(val)),
         _ =>  {
@@ -108,17 +111,32 @@ async fn any_path(_path_to_serve: warp::path::FullPath, workers: WorkersSend, ca
     }    
 }
 
-async fn get_resp(workers: WorkersSend, _cache: Cache) -> Result<String, Box<dyn Error>> {
+async fn get_resp(path_to_serve: warp::path::FullPath, workers: WorkersSend, cache: Cache) -> Result<String, Box<dyn Error>> {
     
-    let sys_id = NEXT_SYS_ID.fetch_add(1, Ordering::Relaxed);
-    let part_1 = "{\"key\": ";
-    let part_2 = format!("{}", sys_id);
-    let part_3 = "}";
-    let content = format!("{}{}{}", part_1, part_2, part_3);
+    let sys_id = NEXT_SYS_ID.fetch_add(1, Ordering::Relaxed).to_string();
 
-    for (&_, tx) in workers.read().await.iter() {
-        if let Err(_disconnected) = tx.send(Ok(Message::text(content.clone()))) {
+    let query = json!({
+        "id": sys_id,
+        "context": {
+            "path": path_to_serve.as_str(),
+        }
+    });
+
+    if let Err(_disconnected) = workers.read().await.get(&1).unwrap().send(
+        Ok(Message::text(query.to_string()))
+    ) { }
+
+    loop {
+        if cache.read().await.contains_key(&sys_id) {
+            break
         }
     }
-    Ok(String::from("owo"))   
+
+    let data = cache.read().await;
+    if data.get(&sys_id) != None {  
+        Ok(data.get(&sys_id).unwrap()["content"].as_str().unwrap().to_string())  
+    } else {
+        Ok(String::from("Bad cache"))
+    }
+     
 }
