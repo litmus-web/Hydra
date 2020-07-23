@@ -24,41 +24,41 @@ Please note the current configuration has the following setup and is purely a pr
 [ ] - Implementing a query system between sockets and workers<br>
 [ ] - Organising incoming worker request (Current system accepts each req as first in first out, which isnt true)<br>
 
-### That Being said nothing like some benchmarks
+### That Being said nothing like some benchmarks -- UPDATED
 **Please Note:**
 - Take these benchmarks as a grain of salt, I cannot fully push these two systems to their limits before bottlenecks either the framework or wrk
 - These benches were Sandman Vs Uvicorn (The current top benchmarked framework)
 - Both systems were ran with single workers (Because my PC would top out otherwise) in a docker container with 2 Cores each and 4GB ram
-- Both frameworks were tasked with serving a 10KB HTML index file, as personally i dont think a `Hello world` test means anything in the real world where these servers need to serve actual data not just two words.
+- Both frameworks were tasked with serving a 2KB HTML fortunes file, as personally i dont think a `Hello world` test means anything in the real world where these servers need to serve actual data not just two words.
 
 Benchmarker used was [wrk](https://github.com/wg/wrk) 
 - 2 Threads
-- 400 connections
+- 512 connections
 - 30 seconds of work
 
 ```
-============ Sandman ============
-web_1  | Running 30s test @ http://127.0.0.1:8080/bob
-web_1  |   2 threads and 400 connections
+============= Sandman =============
+web_1  | Running 30s test @ http://127.0.0.1:8080/
+web_1  |   2 threads and 512 connections
 web_1  |   Thread Stats   Avg      Stdev     Max   +/- Stdev
-web_1  |     Latency   178.93ms   82.78ms   1.22s    93.71%
-web_1  |     Req/Sec     1.14k   269.76     2.62k    72.08%
-web_1  |   67249 requests in 30.05s, 569.60MB read
-web_1  | Requests/sec:   2238.05
-web_1  | Transfer/sec:     18.96MB
+web_1  |     Latency    55.65ms   32.41ms 610.55ms   93.26%
+web_1  |     Req/Sec     4.80k     0.95k    6.42k    88.93%
+web_1  |   284886 requests in 30.05s, 365.42MB read
+web_1  | Requests/sec:   9481.20
+web_1  | Transfer/sec:     12.16MB
 
-============ Uvicorn ============
-web_1  | Running 30s test @ http://127.0.0.1:5050/bob
-web_1  |   2 threads and 400 connections
+============= Uvicorn =============
+web_1  | Running 30s test @ http://127.0.0.1:5050/
+web_1  |   2 threads and 512 connections
 web_1  |   Thread Stats   Avg      Stdev     Max   +/- Stdev
-web_1  |     Latency   185.26ms  160.09ms   2.00s    97.11%
-web_1  |     Req/Sec     1.20k   206.30     1.58k    79.83%
-web_1  |   70207 requests in 30.04s, 595.82MB read
-web_1  |   Socket errors: connect 0, read 0, write 0, timeout 87
-web_1  | Requests/sec:   2337.10
-web_1  | Transfer/sec:     19.83MB
+web_1  |     Latency    86.21ms  111.47ms   1.94s    92.57%
+web_1  |     Req/Sec     3.92k     1.40k    5.89k    81.54%
+web_1  |   232351 requests in 30.06s, 302.47MB read
+web_1  |   Socket errors: connect 0, read 14, write 0, timeout 2
+web_1  | Requests/sec:   7730.09
+web_1  | Transfer/sec:     10.06MB
 ```
-
-An interesting note about these benchmarks is that altho Uvicorn wins by requests/sec Sandman is much more stable with handling many connections at once with 0 timeouts or errors compared to Uvicorns's 87 timeouts and higher avg and max latency
+**Updated:** 
+Sandman has starter to go *quick* as you can see in this demonstration not only do we have a lower latency between requests but we also have 0 socket errors and 1,700 more req a sec. In this instance Uvicorn is deployed with Gunicorn. Sandman is set to max_threads=1 why? I have no idea, it seems to just go faster limited. If someone could tell me why id appriciate it.
 
 Uvicorn also uses the Uvloop event protocol while Sandman is running on pure asyncio Python *not* Uvloop which would also benifit Sandman.
