@@ -36,7 +36,7 @@ Benchmarker used was [wrk](https://github.com/wg/wrk)
 - 512 connections
 - 30 seconds of work
 
-```
+```docker
 ============= Sandman =============
 web_1  | Running 30s test @ http://127.0.0.1:8080/
 web_1  |   2 threads and 512 connections
