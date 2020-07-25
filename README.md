@@ -8,7 +8,11 @@ A experemental Rust to Python hybrid webserver accelerating Python frameworks to
 
 ### WARNING! This repo is mearly a test and prototype of a system and is not complete nor production safe.
 
-The overall aim of this system is to allow compiled, production grade webservers to bind to python workers and frameworks that mearly do lightweight tasks rather than handling http requests directly. This allows for lower latency and few dropped requests due to Rust being able to cope with more.
+The overall aim of this system is to allow compiled, production grade webservers to bind to python workers and frameworks that mearly do lightweight tasks rather than handling http requests directly. This allows for lower latency and few dropped requests due to Rust being able to cope higher load.
+
+At its current state Sandman *is* faster (in my testing) than Uvicorn (the current leader) however Sandman still lacks alot of features.<br>
+
+Sandman makes use of the Rust framework Warp (built off hyper.rs), I could of chosen to use Actix-Web however, I chose not to due to Warp's minimalist system and development rate compared to Actix's drama.
 
 Please note the current configuration has the following setup and is purely a proof of concept done in my free time.
 
