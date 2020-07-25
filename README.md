@@ -64,7 +64,7 @@ Running 15s test @ http://127.0.0.1:5050/
  Requests/sec:   8259.34
  Transfer/sec:      1.19MB
  
-============= AioHTTP =============
+============= AioHttp =============
 Running 15s test @ http://127.0.0.1:8000/
    2 threads and 256 connections
    Thread Stats   Avg      Stdev     Max   +/- Stdev
