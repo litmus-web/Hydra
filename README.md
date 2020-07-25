@@ -27,7 +27,7 @@ Please note the current configuration has the following setup and is purely a pr
 **Please Note:**
 - Take these benchmarks as a grain of salt, I cannot fully push these two systems to their limits before bottlenecks either the framework or wrk
 - These benches were Sandman Vs Uvicorn (The current top benchmarked framework)
-- Both systems were ran with single workers (Because my PC would top out otherwise) in a docker container with 2 Cores each and 4GB ram
+- Both systems were ran with 2 workers (Because my PC would top out otherwise) in a docker container with 2 Cores each and 4GB ram
 - Both frameworks were tasked with serving a 2KB HTML fortunes file, as personally i dont think a `Hello world` test means anything in the real world where these servers need to serve actual data not just two words.
 
 Benchmarker used was [wrk](https://github.com/wg/wrk) 
