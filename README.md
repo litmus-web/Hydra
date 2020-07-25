@@ -12,7 +12,7 @@ The overall aim of this system is to allow compiled, production grade webservers
 
 Please note the current configuration has the following setup and is purely a proof of concept done in my free time.
 
-**Rust Webserver (Warp/Hyper)** --> **Python Workers (Custom sockets)** --> **ASGI Frameworks / Binders**
+**Rust Webserver (Warp/Hyper)** --> **Python Workers** --> **ASGI / WSGI Frameworks / Binders**
 
 ## Currently Working
 [x] - Basic implementation of the Tokio runtime and Warp http<br>
