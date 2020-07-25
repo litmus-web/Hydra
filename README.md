@@ -4,7 +4,7 @@
 
 
 # Sandman
-A experemental Rust to Python hybrid webserver accelerating Python frameworks to warp speed. Its as if it was from a dream.
+A experemental Rust to Python hybrid webserver accelerating Python frameworks to warp speed.
 
 ### WARNING! This repo is mearly a test and prototype of a system and is not complete nor production safe.
 
