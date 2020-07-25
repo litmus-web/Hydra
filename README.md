@@ -15,53 +15,61 @@ Please note the current configuration has the following setup and is purely a pr
 **Rust Webserver (Warp/Hyper)** --> **Python Workers** --> **ASGI / WSGI Frameworks / Binders**
 
 ## Currently Working
-[x] - Basic implementation of the Tokio runtime and Warp http<br>
-[x] - Serving sucessful http requests<br>
+[x] - Basic implementation of the Tokio runtime and Warp http.<br>
+[x] - Serving sucessful http requests.<br>
+[x] - Add scaling for higher loads.<br>
+[x] - Add some loose WSGI workers to let me play with that.<br>
 
 ## Some of the todo list
-[ ] - Adding proper asgi compatability (or custom system if asgi not possible)<br>
-[ ] - Adding route construction <br>
-[ ] - Better / actual query caching<br>
-[x*] - Fix tokio blocking with RwLock - Sorta? fixed?<br>
-[ ] - Static file serving<br>
-[ ] - Implementing a query system between sockets and workers<br>
-[x] - Organising incoming worker request (Current system accepts each req as first in first out, which isnt true)<br>
+[-] - Adding proper asgi compatability (or custom system if asgi not possible)<br>
+[-] - Static file serving<br>
+[-] - CLI commands<br>
+[-] - Internal process manager not manual startup<br>
 
-### That Being said nothing like some benchmarks -- UPDATED
-**Please Note:**
-- Take these benchmarks as a grain of salt, I cannot fully push these two systems to their limits before bottlenecks either the framework or wrk
-- These benches were Sandman Vs Uvicorn (The current top benchmarked framework)
-- Both systems were ran with 2 workers (Because my PC would top out otherwise) in a docker container with 2 Cores each and 4GB ram
-- Both frameworks were tasked with serving a 2KB HTML fortunes file, as personally i dont think a `Hello world` test means anything in the real world where these servers need to serve actual data not just two words.
+## Benchmarks
+
+**Note:** 
+- These benchmarks do not mean much other than to show the potential of Sandman,<br>
+- I decided to take Uvicorn and Aiohttp as two rival frameworks so you can get an idea of how the diffrence in numbers can compare (Uvicorn and Aiohttp are both regularly benchmarked far better than I could ever do).<br>
+- It is also important to note that none of these frameworks were truly pushed to their limits, they were just pushed as hard as my Pc can push them, Wrk was set to 2 threads and dockered to provide some method of control and regulation.
 
 Benchmarker used was [wrk](https://github.com/wg/wrk) 
 - 2 Threads
-- 512 connections
-- 30 seconds of work
+- 256 connections
+- 15 seconds of work
+ran 3 times the best output from each framework was selected.
 
-```docker
+```
 ============= Sandman =============
-web_1  | Running 30s test @ http://127.0.0.1:8080/
-web_1  |   2 threads and 512 connections
-web_1  |   Thread Stats   Avg      Stdev     Max   +/- Stdev
-web_1  |     Latency    55.65ms   32.41ms 610.55ms   93.26%
-web_1  |     Req/Sec     4.80k     0.95k    6.42k    88.93%
-web_1  |   284886 requests in 30.05s, 365.42MB read
-web_1  | Requests/sec:   9481.20
-web_1  | Transfer/sec:     12.16MB
+Running 15s test @ http://127.0.0.1:8080/
+  2 threads and 256 connections
+   Thread Stats   Avg      Stdev     Max   +/- Stdev
+     Latency    24.51ms   17.70ms 321.11ms   96.77%
+     Req/Sec     5.71k     0.89k    6.47k    94.22%
+   167302 requests in 15.04s, 20.90MB read
+  Requests/sec:  11123.87
+  Transfer/sec:      1.39MB
 
 ============= Uvicorn =============
-web_1  | Running 30s test @ http://127.0.0.1:5050/
-web_1  |   2 threads and 512 connections
-web_1  |   Thread Stats   Avg      Stdev     Max   +/- Stdev
-web_1  |     Latency    86.21ms  111.47ms   1.94s    92.57%
-web_1  |     Req/Sec     3.92k     1.40k    5.89k    81.54%
-web_1  |   232351 requests in 30.06s, 302.47MB read
-web_1  |   Socket errors: connect 0, read 14, write 0, timeout 2
-web_1  | Requests/sec:   7730.09
-web_1  | Transfer/sec:     10.06MB
+Running 15s test @ http://127.0.0.1:5050/
+   2 threads and 256 connections
+   Thread Stats   Avg      Stdev     Max   +/- Stdev
+     Latency    35.59ms   29.73ms 307.55ms   91.56%
+     Req/Sec     4.18k     1.43k    5.89k    83.56%
+   124200 requests in 15.04s, 17.89MB read
+ Requests/sec:   8259.34
+ Transfer/sec:      1.19MB
+ 
+============= AioHTTP =============
+Running 15s test @ http://127.0.0.1:8000/
+   2 threads and 256 connections
+   Thread Stats   Avg      Stdev     Max   +/- Stdev
+     Latency    42.34ms   39.12ms 832.40ms   95.83%
+     Req/Sec     3.43k   649.43     4.32k    91.28%
+   101892 requests in 15.03s, 15.84MB read
+ Requests/sec:   6777.97
+ Transfer/sec:      1.05MB
 ```
-**Updated:** 
-Sandman has starter to go *quick* as you can see in this demonstration not only do we have a lower latency between requests but we also have 0 socket errors and 1,700 more req a sec. In this instance Uvicorn is deployed with Gunicorn. Sandman is set to max_threads=1 why? I have no idea, it seems to just go faster limited. If someone could tell me why id appriciate it.
+
 
 Uvicorn also uses the Uvloop event protocol while Sandman is running on pure asyncio Python *not* Uvloop which would also benifit Sandman.
