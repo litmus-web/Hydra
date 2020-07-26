@@ -16,7 +16,7 @@ else:
 logger = logging.getLogger("Sandman")
 
 
-class WsgiAdapter(connector.Server):
+class WSGIAdapter(connector.Server):
     def __init__(self, wsgi_app):
         sys_args = sys.argv
         if len(sys_args) < 2:
@@ -34,9 +34,7 @@ class WsgiAdapter(connector.Server):
 
     def on_http_req(self, ws: websocket.WebSocket, msg: str):
         resp = json.loads(msg)
-
         environ = _to_environ(resp['context'])
-
         caller = StartResponse(ws, resp['id'])
         wsgi_resp = self._wsgi_app(environ, caller)
         caller.join_body(wsgi_resp).send()
@@ -97,5 +95,5 @@ if __name__ == '__main__':
     def hello_world():
         return "hello world"
 
-    wsgi = WsgiAdapter(app)
+    wsgi = WSGIAdapter(app)
     wsgi.start()
