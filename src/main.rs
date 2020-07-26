@@ -7,12 +7,17 @@ use tokio::net::TcpListener;
 use futures::{FutureExt, StreamExt};
 
 use serde_json::json;
+use serde::{Deserialize, Serialize};
 
 use warp::ws::{Message, WebSocket};
-use warp::{Filter, http::HeaderMap};
+use warp::{
+    Filter,
+    http::HeaderMap, 
+    http::StatusCode, 
+    http::Response,
+};
 use warp::hyper;
 
-use std::error::Error;
 use std::sync::Arc;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -26,11 +31,10 @@ use chrono::{DateTime, Utc};
 use clap::{Arg, App};
 
 
-
 static NEXT_SYS_ID: AtomicUsize = AtomicUsize::new(1);
 
 type WorkersSend = Arc<RwLock<HashMap<usize, mpsc::UnboundedSender<Result<Message, warp::Error>>>>>;
-type Cache = Arc<RwLock<HashMap<String, serde_json::Value>>>;
+type Cache = Arc<RwLock<HashMap<String, ASGIResponse>>>;
 
 
 #[derive(Clone)]
@@ -40,6 +44,15 @@ struct WorkerConfig {
     port: u16,
     thread_count: usize,
 }
+
+#[derive(Serialize, Deserialize, Clone)]
+struct ASGIResponse {
+    id: String,
+    body: String,
+    status: u16,
+    headers: Vec<Vec<String>>,
+}
+
 
 fn main() {    
 
@@ -219,10 +232,8 @@ async fn worker_connected(ws: WebSocket, cfg: WorkerConfig, wrk_send: WorkersSen
         } else {
             return;
         };
-        let mut data: serde_json::Value = serde_json::from_str(msg).unwrap();
-        let key: serde_json::Value = data["id"].take();
-        let key = key.as_str().unwrap();
-        cache.write().await.insert(key.to_owned(), data);
+        let data: ASGIResponse = serde_json::from_str(msg).unwrap();
+        cache.write().await.insert(data.id.clone(), data);
     }
 }
 
@@ -239,17 +250,34 @@ async fn any_path(
     ) -> Result<impl warp::Reply, warp::Rejection> {
 
     if workers.read().await.len() < cfg.thread_count {
-        Ok(warp::reply::html("Webserver is not ready yet!".to_owned()))
+        Ok(
+            Response::builder()
+                .status(503)
+                .body(String::from("The server has not finished starting!"))
+                .unwrap()
+        )
     } else {
-        let content  = get_resp(path_to_serve, cfg, headers, http_method, workers, cache).await;
-        match content {
-            Ok(val) => Ok(warp::reply::html(val)),
-            _ =>  {
-                Ok(warp::reply::html("Oops! and error has ucoured.".to_owned()))
-            }
+        let response  = get_resp(
+            path_to_serve,
+            cfg, 
+            headers, 
+            http_method, 
+            workers, 
+            cache).await;
+
+        match response {
+            Ok(r) => Ok(r),
+            _ => Ok(
+                Response::builder()
+                    .status(503)
+                    .body(String::from("The server has ran into an error."))
+                    .unwrap()
+            ),
         }
+        
     }    
 }
+
 
 async fn get_resp(
     path_to_serve: warp::path::FullPath, 
@@ -258,7 +286,7 @@ async fn get_resp(
     http_method: hyper::Method,
     workers: WorkersSend, 
     cache: Cache
-    ) -> Result<String, Box<dyn Error>> {
+    ) -> warp::http::Result<Response<String>> {
 
     let sys_id = NEXT_SYS_ID.fetch_add(1, Ordering::Relaxed).to_string();
     let mut header_map = HashMap::new();
@@ -300,12 +328,27 @@ async fn get_resp(
     }
 
     let data = cache.read().await;    
-    if data.get(&sys_id) != None {
-        Ok(data.get(&sys_id).unwrap()["content"].as_str().unwrap().to_string())
-    } else {
-        Ok(String::from("Bad cache"))
-    }
+    match data.get(&sys_id) {
+        Some(_) => {
+            let asgi_resp = data.get(&sys_id).unwrap();
+            let headers: Vec<Vec<String>> = asgi_resp.headers.clone();
+            let status: u16 = asgi_resp.status;
+      
+            let mut resp = Response::builder()
+                .status(StatusCode::from_u16(status).unwrap());
 
+            for v in headers.iter() {
+                resp = resp.header(v[0].as_str(), v[1].as_str()) 
+            }
+            resp.body(asgi_resp.clone().body)
+        },
+        _ => {
+            let resp = Response::builder()
+                .status(StatusCode::from_u16(503).unwrap())
+                .body("No cache".into()).unwrap();  
+            Ok(resp)
+        }
+    } 
 }
 
 
