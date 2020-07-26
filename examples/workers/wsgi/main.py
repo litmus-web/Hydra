@@ -37,27 +37,44 @@ class WsgiAdapter(connector.Server):
 
         environ = _to_environ(resp['context'])
 
-        caller = StartResponse()
+        caller = StartResponse(ws, resp['id'])
         wsgi_resp = self._wsgi_app(environ, caller)
-        body = caller.join_body(wsgi_resp)
-        ws.send(json.dumps({'id': resp['id'], 'content': body}))
+        caller.join_body(wsgi_resp).send()
 
 
 class StartResponse:
-    def __call__(self, *args, **kwargs):
-        pass
-        # print(args, kwargs)
+    def __init__(self, ws: websocket.WebSocket, id_: int):
+        self._ws = ws
+        self._id = id_
+        self._body = ""
+        self._status_code = 200
+        self._headers = []
 
-    @staticmethod
-    def join_body(resp: typing.Generator):
-        body = ""
+    def __call__(self, *args, **kwargs):
+        status: str = args[0]
+        self._status_code = int(status.split(" ")[0])
+        self._headers = args[1]
+
+    def join_body(self, resp: typing.Generator):
         for bod in resp:
-            body += bod.decode('utf-8')
-        return body
+            self._body += bod.decode('utf-8')
+        return self
+
+    def send(self):
+        self._ws.send(
+            json.dumps(
+                {
+                    'id': self._id,
+                    'body': self._body,
+                    'status': self._status_code,
+                    'headers': self._headers,
+                }
+            )
+        )
 
 
 def _format_headers(headers: dict):
-    return dict(map(lambda v: ("HTTP_%s" % v[0], v[1]), headers.items()))
+    return dict(map(lambda v: ("HTTP_%s" % v[0].upper(), v[1]), headers.items()))
 
 def _to_environ(context: dict) -> dict:
     return {

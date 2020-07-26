@@ -1,7 +1,8 @@
-from flask import Flask
+from flask import Flask, session
 from workers import WsgiAdapter
 
 app = Flask(__name__)
+app.secret_key = "gagagasdgfasdgadfg"
 
 @app.route("/")
 def hello_world():
