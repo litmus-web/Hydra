@@ -240,45 +240,51 @@ async fn worker_connected(ws: WebSocket, cfg: WorkerConfig, wrk_send: WorkersSen
 
 //  Endpoint area
 async fn any_path(
-    path_to_serve: warp::path::FullPath, 
-    cfg: WorkerConfig, 
-    headers: HeaderMap, 
-    http_method: hyper::Method,
-    workers: WorkersSend, 
-    cache: Cache
+    _path_to_serve: warp::path::FullPath, 
+    _cfg: WorkerConfig, 
+    _headers: HeaderMap, 
+    _http_method: hyper::Method,
+    _workers: WorkersSend, 
+    _cache: Cache
     ) -> Result<impl warp::Reply, warp::Rejection> {
-
-    if workers.read().await.len() < cfg.thread_count {
         Ok(
             Response::builder()
-                .status(503)
-                .body(String::from("The server has not finished starting!"))
+                .status(200)
+                .body(String::from("Hello world!"))
                 .unwrap()
-        )
-    } else {
-        let response  = get_resp(
-            path_to_serve,
-            cfg, 
-            headers, 
-            http_method, 
-            workers, 
-            cache).await;
+            )
 
-        match response {
-            Ok(r) => Ok(r),
-            _ => Ok(
-                Response::builder()
-                    .status(503)
-                    .body(String::from("The server has ran into an error."))
-                    .unwrap()
-            ),
-        }
-        
-    }    
+    //if workers.read().await.len() < cfg.thread_count {
+    //    Ok(
+    //        Response::builder()
+    //            .status(503)
+    //            .body(String::from("The server has not finished starting!"))
+    //            .unwrap()
+    //    )
+    //} else {
+    //   let response  = get_resp(
+    //        path_to_serve,
+    //        cfg, 
+    //        headers, 
+    //        http_method, 
+    //        workers, 
+    //        cache).await;
+    //
+    //    match response {
+    //        Ok(r) => Ok(r),
+    //        _ => Ok(
+    //            Response::builder()
+    //                .status(503)
+    //                .body(String::from("The server has ran into an error."))
+    //                .unwrap()
+    //        ),
+    //   }
+    //    
+    //}    
 }
 
 
-async fn get_resp(
+async fn _get_resp(
     path_to_serve: warp::path::FullPath, 
     cfg: WorkerConfig, 
     headers: HeaderMap, 
