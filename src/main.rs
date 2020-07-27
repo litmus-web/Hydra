@@ -2,7 +2,7 @@ use tokio::sync::{mpsc, RwLock};
 use tokio::time::{delay_for, Duration};
 use tokio::runtime::{Builder};
 use tokio::net::TcpListener;
-// use tokio::process::Command;
+use tokio::process::Command;
 
 use futures::{FutureExt, StreamExt};
 
@@ -106,15 +106,14 @@ fn start_workers(cfg: WorkerConfig) {
 async fn run_main(cfg: WorkerConfig) -> Result<(), Box<dyn std::error::Error>> { 
     
     // Setting some things before we start
-    let target_path = String::from("file:app"); 
+    let target_path = String::from("ASGI_Raw:app"); 
     let temp = target_path.split(":").collect::<Vec<&str>>();
-    let _file_path = temp[0];
-    let _app = temp[1];
+    let file_path = temp[0];
 
-    //let child = Command::new("python")
-    //    .arg(format!("{}.py", file_path))
-    //    .arg(app)
-    //    .spawn();
+    let _child = Command::new("python")
+        .arg(format!("{}.py", file_path))
+        .arg(format!("{}", cfg.id))
+        .spawn();
 
     
     // Logging
