@@ -1,0 +1,3 @@
+aiohttp
+pyuv
+websocket-client-py3
