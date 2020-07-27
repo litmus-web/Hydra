@@ -28,7 +28,7 @@ use colored::*;
 
 use chrono::{DateTime, Utc};
 
-use clap::{Arg, App};
+// use clap::{Arg, App};
 
 
 static NEXT_SYS_ID: AtomicUsize = AtomicUsize::new(1);
@@ -70,19 +70,19 @@ fn main() {
     println!("{}", "==============================================".cyan());
     
 
-    //for i in 1..threads {
-    //    let config = WorkerConfig{
-    //        id: i,
-    //        host: host.clone(),
-    //        port,
-    //        thread_count: threads,
-    //    };
-    //
-    //    let _ = thread::Builder::new().name(
-    //        format!("sandman-worker-{}", i).to_string()).spawn(
-    //            move || { start_workers(config) }
-    //        );
-    //};    
+    for i in 1..threads {
+        let config = WorkerConfig{
+            id: i,
+            host: host.clone(),
+            port,
+            thread_count: threads,
+        };
+
+        let _ = thread::Builder::new().name(
+            format!("sandman-worker-{}", i).to_string()).spawn(
+                move || { start_workers(config) }
+            );
+    };    
 
     let config = WorkerConfig{
             id: threads,
@@ -95,7 +95,7 @@ fn main() {
 
 fn start_workers(cfg: WorkerConfig) {
     let mut rt = Builder::new()
-    .threaded_scheduler()
+    .basic_scheduler()
     .enable_all()
     .build()
     .unwrap();
@@ -106,7 +106,7 @@ fn start_workers(cfg: WorkerConfig) {
 async fn run_main(cfg: WorkerConfig) -> Result<(), Box<dyn std::error::Error>> { 
     
     // Setting some things before we start
-    let target_path = String::from("ASGI_Raw:app"); 
+    let target_path = String::from("file:app"); 
     let temp = target_path.split(":").collect::<Vec<&str>>();
     let file_path = temp[0];
 
