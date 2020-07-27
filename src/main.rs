@@ -70,19 +70,19 @@ fn main() {
     println!("{}", "==============================================".cyan());
     
 
-    for i in 1..threads {
-        let config = WorkerConfig{
-            id: i,
-            host: host.clone(),
-            port,
-            thread_count: threads,
-        };
-
-        let _ = thread::Builder::new().name(
-            format!("sandman-worker-{}", i).to_string()).spawn(
-                move || { start_workers(config) }
-            );
-    };    
+    //for i in 1..threads {
+    //    let config = WorkerConfig{
+    //        id: i,
+    //        host: host.clone(),
+    //        port,
+    //        thread_count: threads,
+    //    };
+    //
+    //    let _ = thread::Builder::new().name(
+    //        format!("sandman-worker-{}", i).to_string()).spawn(
+    //            move || { start_workers(config) }
+    //        );
+    //};    
 
     let config = WorkerConfig{
             id: threads,
@@ -95,7 +95,7 @@ fn main() {
 
 fn start_workers(cfg: WorkerConfig) {
     let mut rt = Builder::new()
-    .basic_scheduler()
+    .threaded_scheduler()
     .enable_all()
     .build()
     .unwrap();
