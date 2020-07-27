@@ -77,15 +77,7 @@ fn main() {
             port,
             thread_count: threads,
         };
-        // Setting some things before we start
-        let target_path = String::from("ASGI_Raw:app"); 
-        let temp = target_path.split(":").collect::<Vec<&str>>();
-        let file_path = temp[0];
-
-        let _child = Command::new("python")
-            .arg(format!("{}.py", file_path))
-            .arg(format!("{}", config.id))
-            .spawn();
+  
 
         let _ = thread::Builder::new().name(
             format!("sandman-worker-{}", i).to_string()).spawn(
@@ -102,16 +94,6 @@ fn main() {
             thread_count: threads,
     };
 
-    // Setting some things before we start
-    let target_path = String::from("ASGI_Raw:app"); 
-    let temp = target_path.split(":").collect::<Vec<&str>>();
-    let file_path = temp[0];
-
-    let _child = Command::new("python")
-        .arg(format!("{}.py", file_path))
-        .arg(format!("{}", config.id))
-        .spawn();
-
     start_workers(config)
 }
 
@@ -126,7 +108,15 @@ fn start_workers(cfg: WorkerConfig) {
 }
 
 async fn run_main(cfg: WorkerConfig) -> Result<(), Box<dyn std::error::Error>> {   
+    // Setting some things before we start
+    let target_path = String::from("ASGI_Raw:app"); 
+    let temp = target_path.split(":").collect::<Vec<&str>>();
+    let _file_path = temp[0];
 
+    let _child = Command::new("python")
+            .arg(format!("ASGI_Raw.py"))
+            .arg(format!("{}", cfg.id))
+            .spawn();
     
     // Logging
     log_info(format!("{} {}", "[ Rust Worker ]".red(), "Starting thread."));
