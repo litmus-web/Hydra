@@ -57,7 +57,7 @@ struct ASGIResponse {
 fn main() {    
 
     // some stuff
-    let threads: usize = 1;
+    let threads: usize = 2;
 
     let host: Ipv4Addr = Ipv4Addr::new(0, 0, 0, 0);
     let port: u16 = 8080;
@@ -106,7 +106,7 @@ fn start_workers(cfg: WorkerConfig) {
 async fn run_main(cfg: WorkerConfig) -> Result<(), Box<dyn std::error::Error>> { 
     
     // Setting some things before we start
-    let target_path = String::from("file:app"); 
+    let target_path = String::from("ASGI_Raw:app"); 
     let temp = target_path.split(":").collect::<Vec<&str>>();
     let file_path = temp[0];
 
@@ -240,51 +240,45 @@ async fn worker_connected(ws: WebSocket, cfg: WorkerConfig, wrk_send: WorkersSen
 
 //  Endpoint area
 async fn any_path(
-    _path_to_serve: warp::path::FullPath, 
-    _cfg: WorkerConfig, 
-    _headers: HeaderMap, 
-    _http_method: hyper::Method,
-    _workers: WorkersSend, 
-    _cache: Cache
+    path_to_serve: warp::path::FullPath, 
+    cfg: WorkerConfig, 
+    headers: HeaderMap, 
+    http_method: hyper::Method,
+    workers: WorkersSend, 
+    cache: Cache
     ) -> Result<impl warp::Reply, warp::Rejection> {
+
+    if workers.read().await.len() < cfg.thread_count {
         Ok(
             Response::builder()
-                .status(200)
-                .body(String::from("Hello world!"))
+                .status(503)
+                .body(String::from("The server has not finished starting!"))
                 .unwrap()
-            )
+        )
+    } else {
+        let response  = get_resp(
+            path_to_serve,
+            cfg, 
+            headers, 
+            http_method, 
+            workers, 
+            cache).await;
 
-    //if workers.read().await.len() < cfg.thread_count {
-    //    Ok(
-    //        Response::builder()
-    //            .status(503)
-    //            .body(String::from("The server has not finished starting!"))
-    //            .unwrap()
-    //    )
-    //} else {
-    //   let response  = get_resp(
-    //        path_to_serve,
-    //        cfg, 
-    //        headers, 
-    //        http_method, 
-    //        workers, 
-    //        cache).await;
-    //
-    //    match response {
-    //        Ok(r) => Ok(r),
-    //        _ => Ok(
-    //            Response::builder()
-    //                .status(503)
-    //                .body(String::from("The server has ran into an error."))
-    //                .unwrap()
-    //        ),
-    //   }
-    //    
-    //}    
+        match response {
+            Ok(r) => Ok(r),
+            _ => Ok(
+                Response::builder()
+                    .status(503)
+                    .body(String::from("The server has ran into an error."))
+                    .unwrap()
+            ),
+        }
+        
+    }    
 }
 
 
-async fn _get_resp(
+async fn get_resp(
     path_to_serve: warp::path::FullPath, 
     cfg: WorkerConfig, 
     headers: HeaderMap, 
@@ -293,7 +287,7 @@ async fn _get_resp(
     cache: Cache
     ) -> warp::http::Result<Response<String>> {
 
-    let sys_id = NEXT_SYS_ID.fetch_add(1, Ordering::Relaxed).to_string();
+    let sys_id = NEXT_SYS_ID.fetch_add(1, Ordering::Relaxed);
     let mut header_map = HashMap::new();
 
     for (key, value) in headers.iter() {
@@ -302,6 +296,13 @@ async fn _get_resp(
              format!("{}", value.to_str().unwrap_or("None"))
             );
     }
+
+    let mut id_: usize = 2;
+    if sys_id % 2 == 0 {
+        id_ = 1;
+    }
+
+    let sys_id = sys_id.to_string();
 
     let query = json!({
         "id": sys_id,
@@ -315,9 +316,11 @@ async fn _get_resp(
         }
     });
 
+    
+
     if let Err(_disconnected) = workers
         .read().await
-        .get(&cfg.id).unwrap()
+        .get(&id_).unwrap()
         .send(Ok(Message::text(query.to_string()))) {
             log_info(
                 format!(
