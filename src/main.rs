@@ -65,8 +65,8 @@ fn main() {
     
     println!("{}", "=============== Starting Sandman =============".cyan());
     println!("  Worker count:  {}", threads);
-    println!("  Worker path  @ ws://127.0.0.1:8080/workers");
-    println!("  Server running  @ http://127.0.0.1:8080/");
+    println!("  Worker path  @ ws://127.0.0.1:{}/workers", port);
+    println!("  Server running  @ http://127.0.0.1:{}/", port);
     println!("{}", "==============================================".cyan());
     
 
@@ -74,7 +74,7 @@ fn main() {
         let config = WorkerConfig{
             id: i,
             host: host.clone(),
-            port: port,
+            port,
             thread_count: threads,
         };
 
@@ -87,7 +87,7 @@ fn main() {
     let config = WorkerConfig{
             id: threads,
             host: host.clone(),
-            port: port,
+            port,
             thread_count: threads,
     };
     start_workers(config)
