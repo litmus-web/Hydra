@@ -57,7 +57,7 @@ struct ASGIResponse {
 fn main() {    
 
     // some stuff
-    let threads: usize = 2;
+    let threads: usize = 4;
 
     let host: Ipv4Addr = Ipv4Addr::new(0, 0, 0, 0);
     let port: u16 = 8080;
@@ -297,9 +297,13 @@ async fn get_resp(
             );
     }
 
-    let mut id_: usize = 2;
+    let mut id_: usize = 1;
     if sys_id % 2 == 0 {
-        id_ = 1;
+        id_ = 2;
+    } else if sys_id % 3 == 0 {
+        id_ = 3;
+    } else if sys_id % 5 == 0 {
+        id_ = 4;
     }
 
     let sys_id = sys_id.to_string();
