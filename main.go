@@ -16,12 +16,6 @@ var workers = make(map[string]*websocket.Conn)
 var sendChannel = make(chan map[string]interface{})
 var readChannel = make(chan ASGIResponse)
 
-type ASGIResponse struct {
-	headers map[string][]string
-	body string
-	status int
-}
-
 func main() {
 	http.HandleFunc("/", requestHandler)
 	http.HandleFunc("/workers", handleWs)
@@ -35,9 +29,24 @@ func main() {
 	_ = http.ListenAndServe(":80", nil)
 }
 
+type Identify struct {
+	Id int `json:"id"`
+	Auth string `json:"authorization"`
+}
 
 func handleWs(w http.ResponseWriter, r *http.Request) {
 	conn, _ := upgrade.Upgrade(w, r, nil) // error ignored for sake of simplicity
+	type_, msg, err := conn.ReadMessage()
+	if err == nil {
+		if type_ == 1 {
+			payload := Identify{}
+			err := json.Unmarshal(msg, &payload)
+			if err == nil {
+				
+			}
+		}
+	}
+
 	workers["abc"] = conn
 }
 
@@ -48,6 +57,12 @@ func scheduleWorkers() {
 			_ = workers["abc"].WriteJSON(msg)
 		}
 	}
+}
+
+type ASGIResponse struct {
+	headers map[string][]string `json:"-"`
+	Body    string              `json:"body"`
+	Status  int                 `json:"status"`
 }
 
 func scheduleRecv() {
@@ -75,6 +90,11 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 		"server":  "Sandman",
 	}
 	sendChannel <- outgoing
-	val := <-readChannel
-	_, _ = fmt.Fprint(w, val.body)
+	val := <- readChannel
+	w.WriteHeader(val.Status) // Status code
+	//header := w.Header()
+	//for k, v := range val.headers {
+	//	header.Add(k, v)
+	//}
+	_, _ = fmt.Fprint(w, val.Body) // Request Body
 }
