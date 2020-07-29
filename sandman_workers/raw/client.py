@@ -1,4 +1,5 @@
 import asyncio
+import aiohttp
 from aiohttp import ClientSession
 
 
@@ -15,10 +16,26 @@ class Server:
     async def _start(self) -> None:
         async with ClientSession() as session:
             self._ws = await session.ws_connect(self._host)
-            print("Worker {} has connected to Sandman!".format(self._id))
-            while True:
-                resp = (await self._ws.receive_str())
-                self._loop.create_task(self.on_message(self._ws, resp))
+            if (await self._ws.receive()).type != aiohttp.WSMsgType.CLOSED:
+                payload = {"authorization": "abcdef", "id": 123}
+                await self._ws.send_json(payload)
+                resp = await self._ws.receive(timeout=10)
+                if resp.type != aiohttp.WSMsgType.CLOSED:
+                    raise ConnectionRefusedError("Worker has been refused connection to Sandman\n")
+                else:
+                    if resp.data is None:
+                        raise ConnectionRefusedError("Worker has been refused connection to Sandman\n"
+                                                     "Message: Incorrect authorization\n")
+
+                    print("Worker {} has connected to Sandman!".format(self._id))
+                    await self._handle_connections()
+            else:
+                raise ConnectionRefusedError("Worker has been refused connection to Sandman")
+
+    async def _handle_connections(self):
+        while True:
+            resp = (await self._ws.receive_str())
+            self._loop.create_task(self.on_message(self._ws, resp))
 
     async def on_message(self, ws, msg) -> None:
         resp = {
