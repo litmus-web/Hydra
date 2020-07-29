@@ -1,0 +1,27 @@
+version: '3'
+
+services:
+  sandman-test:
+    build: ..
+    command: sandman
+    volumes:
+      - .:/code
+    ports:
+      - "8080:8080"
+  sandman-worker:
+    build: ..
+    command: python "sandman_py/client.py"
+    volumes:
+      - .:/code
+  uvicorn-test:
+    build: ..
+    command: gunicorn "uvicorn_py.uvicorn_server:app" -b "0.0.0.0:5050" -w 4 -k uvicorn.workers.UvicornWorker
+    volumes:
+      - .:/code
+    ports:
+      - "5050:5050"
+  benchmark:
+    build: ..
+    command: python run.py
+    volumes:
+      - .:/code
