@@ -15,7 +15,7 @@ services:
       - .:/code
   uvicorn-test:
     build: .
-    command: gunicorn "uvicorn_py.uvicorn_server:app" -b "0.0.0.0:5050" -w 1 -k uvicorn.workers.UvicornWorker
+    command: gunicorn "uvicorn_py.uvicorn_server:app" -b "0.0.0.0:5050" -w 4 -k uvicorn.workers.UvicornWorker
     volumes:
       - .:/code
     ports:
