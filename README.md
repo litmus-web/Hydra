@@ -24,7 +24,7 @@ __Settings__
 
 
 ```
-benchmark_1       | Round 1 |  Sandman:  Requests/sec:  28209.18  Req/Sec         Round 1 |  Uvicorn:  Requests/sec:  22603.35  Req/Sec
-benchmark_1       | Round 2 |  Sandman:  Requests/sec:  28149.09  Req/Sec         Round 2 |  Uvicorn:  Requests/sec:  24908.73  Req/Sec
-benchmark_1       | Round 3 |  Sandman:  Requests/sec:  28206.76  Req/Sec         Round 3 |  Uvicorn:  Requests/sec:  21675.43  Req/Sec
+Round 1 |  Sandman:  Requests/sec:  28209.18  Req/Sec         Round 1 |  Uvicorn:  Requests/sec:  22603.35  Req/Sec
+Round 2 |  Sandman:  Requests/sec:  28149.09  Req/Sec         Round 2 |  Uvicorn:  Requests/sec:  24908.73  Req/Sec
+Round 3 |  Sandman:  Requests/sec:  28206.76  Req/Sec         Round 3 |  Uvicorn:  Requests/sec:  21675.43  Req/Sec
 ```
