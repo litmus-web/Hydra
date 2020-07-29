@@ -4,6 +4,7 @@
 # Sandman
 A experemental Rust to Python hybrid webserver, combining the power of rust and the niceties of python.
 
+## We've moved to Golang!
 The overall aim of this system is to allow compiled, production grade webservers to bind to python workers and frameworks that mearly do lightweight tasks rather than handling http requests directly. This allows for lower latency and few dropped requests due to Rust being able to cope with more.
 
 Please note the current configuration has the following setup and is purely a proof of concept done in my free time.
