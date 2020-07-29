@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/websocket"
+	"log"
 	"math/rand"
 	"net/http"
 
@@ -41,11 +42,10 @@ func main() {
 	target := process_management.TargetApp{
 		Target: "tests\\worker_test\\process_client.py",
 		App:    "app",
-		Id:     "2",
 		Auth:   authorization,
 	}
 	fmt.Println(target)
-	//go process_management.StartWorkers(1, target)
+	go process_management.StartWorkers(2, target)
 
 	http.HandleFunc("/", requestHandler)
 	http.HandleFunc("/workers", handleWs)
@@ -60,7 +60,7 @@ func main() {
 }
 
 type Identify struct {
-	Id   int    `json:"id"`
+	Id_  string `json:"id_"`
 	Auth string `json:"authorization"`
 }
 
@@ -79,8 +79,8 @@ func handleWs(w http.ResponseWriter, r *http.Request) {
 			err := json.Unmarshal(msg, &payload)
 			if err == nil {
 				if payload.Auth == authorization {
-					println("Worker", payload.Id, "sucessfully connected to server.")
-					workers["abc"] = conn
+					log.Println("Worker", payload.Id_, "successfully connected to server.")
+					workers[payload.Id_] = conn
 				} else {
 					_ = conn.Close()
 					return
@@ -94,11 +94,10 @@ func handleWs(w http.ResponseWriter, r *http.Request) {
 
 func scheduleWorkers() {
 	for {
-		if workers["abc"] != nil {
+		if workers["1"] != nil {
 			msg := <-sendChannel
-			_ = workers["abc"].WriteJSON(msg)
+			_ = workers["1"].WriteJSON(msg)
 		}
-		time.Sleep(5 * time.Millisecond)
 	}
 }
 
@@ -110,8 +109,8 @@ type ASGIResponse struct {
 
 func scheduleRecv() {
 	for {
-		if workers["abc"] != nil {
-			_, msg, err := workers["abc"].ReadMessage()
+		if workers["1"] != nil {
+			_, msg, err := workers["1"].ReadMessage()
 			if err == nil {
 				data := ASGIResponse{}
 				err := json.Unmarshal(msg, &data)
@@ -120,7 +119,6 @@ func scheduleRecv() {
 				}
 			}
 		}
-		time.Sleep(5 * time.Millisecond)
 	}
 }
 
