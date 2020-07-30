@@ -3,21 +3,17 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/websocket"
 	"log"
 	"math/rand"
-	"net/http"
-
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/fasthttp-contrib/websocket"
+	"github.com/valyala/fasthttp"
 
 	"./process_management"
 )
-
-var upgrade = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-}
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
@@ -37,6 +33,7 @@ var workers = make(map[string]*websocket.Conn)
 var sendChannel = make(chan map[string]interface{})
 var readChannel = make(chan ASGIResponse)
 var authorization = randAuth(12)
+var mapMutex = sync.Mutex{}
 
 func main() {
 	target := process_management.TargetApp{
@@ -47,16 +44,16 @@ func main() {
 	fmt.Println(target)
 	go process_management.StartWorkers(2, target)
 
-	http.HandleFunc("/", requestHandler)
-	http.HandleFunc("/workers", handleWs)
+	requestHandler := func(ctx *fasthttp.RequestCtx) {
+		switch string(ctx.Path()) {
+		case "/workers":
+			onWsConnect(ctx)
+		default:
+			requestHandler(ctx)
+		}
+	}
 
-	fs := http.FileServer(http.Dir("static/"))
-	http.Handle("/static/", http.StripPrefix("/static/", fs))
-
-	go scheduleWorkers()
-	go scheduleRecv()
-
-	_ = http.ListenAndServe(":80", nil)
+	_ = fasthttp.ListenAndServe(":80", requestHandler)
 }
 
 type Identify struct {
@@ -64,8 +61,19 @@ type Identify struct {
 	Auth string `json:"authorization"`
 }
 
-func handleWs(w http.ResponseWriter, r *http.Request) {
-	conn, _ := upgrade.Upgrade(w, r, nil) // error ignored for sake of simplicity
+type ASGIResponse struct {
+	headers map[string][]string `json:"-"`
+	Body    string              `json:"body"`
+	Status  int                 `json:"status"`
+}
+
+var upgrader = websocket.New(handleWs)
+
+func onWsConnect(ctx *fasthttp.RequestCtx) {
+	_ = upgrader.Upgrade(ctx)
+}
+
+func handleWs(conn *websocket.Conn) {
 	remote := strings.SplitAfter(conn.RemoteAddr().String(), ":")[0][:9]
 	if remote != "127.0.0.1" {
 		_ = conn.Close()
@@ -80,7 +88,8 @@ func handleWs(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				if payload.Auth == authorization {
 					log.Println("Worker", payload.Id_, "successfully connected to server.")
-					workers[payload.Id_] = conn
+					go handleWriteWebSocketConn(conn)
+					handleReadWebSocketConn(conn)
 				} else {
 					_ = conn.Close()
 					return
@@ -88,55 +97,53 @@ func handleWs(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-
-	workers["abc"] = conn
 }
 
-func scheduleWorkers() {
+func handleReadWebSocketConn(conn *websocket.Conn) {
 	for {
-		if workers["1"] != nil {
-			msg := <-sendChannel
-			_ = workers["1"].WriteJSON(msg)
-		}
-	}
-}
-
-type ASGIResponse struct {
-	headers map[string][]string `json:"-"`
-	Body    string              `json:"body"`
-	Status  int                 `json:"status"`
-}
-
-func scheduleRecv() {
-	for {
-		if workers["1"] != nil {
-			_, msg, err := workers["1"].ReadMessage()
-			if err == nil {
-				data := ASGIResponse{}
-				err := json.Unmarshal(msg, &data)
+		type_, msg, err := conn.ReadMessage()
+		if err == nil {
+			if type_ == 1 {
+				payload := ASGIResponse{}
+				err := json.Unmarshal(msg, &payload)
 				if err == nil {
-					readChannel <- data
+					readChannel <- payload
 				}
 			}
 		}
 	}
 }
 
-func requestHandler(w http.ResponseWriter, r *http.Request) {
-	outgoing := map[string]interface{}{
-		"method":  r.Method,
-		"path":    r.URL,
-		"remote":  r.RemoteAddr,
-		"headers": r.Header,
-		"form":    r.Form,
+func handleWriteWebSocketConn(conn *websocket.Conn) {
+	for {
+		outgoing := <-sendChannel
+		msg, err := json.Marshal(outgoing)
+		if err == nil {
+			err = conn.WriteMessage(1, msg)
+			if err != nil {
+				log.Fatal("Message send failed.")
+			}
+		}
+	}
+}
+
+func requestHandler(ctx *fasthttp.RequestCtx) {
+	toGo := map[string]interface{}{
+		"method":  ctx.Method(),
+		"path":    ctx.Path(),
+		"remote":  ctx.RemoteAddr().String(),
+		"headers": ctx.Request.Header,
+		"body":    string(ctx.Request.Body()),
 		"server":  "Sandman",
 	}
-	sendChannel <- outgoing
-	val := <-readChannel
-	w.WriteHeader(val.Status) // Status code
+
+	sendChannel <- toGo
+	response := <-readChannel
+	ctx.SetStatusCode(response.Status)
+
 	//header := w.Header()
 	//for k, v := range val.headers {
 	//	header.Add(k, v)
 	//}
-	_, _ = fmt.Fprint(w, val.Body) // Request Body
+	_, _ = fmt.Fprint(ctx, response.Body) // Request Body
 }
