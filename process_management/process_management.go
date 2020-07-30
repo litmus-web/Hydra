@@ -97,7 +97,7 @@ func handleNewWorker(worker *exec.Cmd) {
 func handleRestartWorker(worker *exec.Cmd) {
 	err := worker.Start()
 	if err != nil {
-		panic("Unable to start worker process")
+		log.Fatal("Unable to start worker process")
 	} else {
 		time.Sleep(200 * time.Millisecond)
 		log.Println("Started worker with Pid: ", worker.Process.Pid)
