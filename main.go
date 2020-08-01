@@ -2,15 +2,17 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"math/rand"
+	"runtime"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/fasthttp-contrib/websocket"
+	"github.com/fasthttp/websocket"
 	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/prefork"
 
 	"./process_management"
 )
@@ -29,20 +31,30 @@ func randAuth(n int) string {
 	return string(b)
 }
 
-var workers = make(map[string]*websocket.Conn)
-var sendChannel = make(chan map[string]interface{})
-var readChannel = make(chan ASGIResponse)
+var recvChannel = make(chan map[string]interface{})
+var sendChannel = make(chan ASGIResponse)
 var authorization = randAuth(12)
-var mapMutex = sync.Mutex{}
+
+// Flags
+var (
+	target = flag.String(
+		"filepath",
+		"tests\\worker_test\\process_client.py",
+		"Specify the file containing the app")
+	app = flag.String(
+		"app",
+		"app",
+		"Specify the app variable/object")
+)
 
 func main() {
+	flag.Parse()
 	target := process_management.TargetApp{
-		Target: "tests\\worker_test\\process_client.py",
-		App:    "app",
+		Target: *target,
+		App:    *app,
 		Auth:   authorization,
 	}
-	fmt.Println(target)
-	go process_management.StartWorkers(2, target)
+	go process_management.StartWorkers(1, target) // Do not change, archive of old method
 
 	requestHandler := func(ctx *fasthttp.RequestCtx) {
 		switch string(ctx.Path()) {
@@ -53,7 +65,24 @@ func main() {
 		}
 	}
 
-	_ = fasthttp.ListenAndServe(":80", requestHandler)
+	if runtime.GOOS == "windows" {
+		log.Println("Pre-Forking is not supported on windows runtime, Switching to standard mode.")
+		if err := fasthttp.ListenAndServe(":80", requestHandler); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		log.Println("Pre-Forking mode enabled.")
+		server := &fasthttp.Server{
+			Handler: requestHandler,
+			Name:    "Sandman",
+		}
+
+		preforkServer := prefork.New(server)
+
+		if err := preforkServer.ListenAndServe(":80"); err != nil {
+			log.Fatal(err)
+		}
+	}
 }
 
 type Identify struct {
@@ -67,10 +96,10 @@ type ASGIResponse struct {
 	Status  int                 `json:"status"`
 }
 
-var upgrader = websocket.New(handleWs)
+var upgrader = websocket.FastHTTPUpgrader{}
 
 func onWsConnect(ctx *fasthttp.RequestCtx) {
-	_ = upgrader.Upgrade(ctx)
+	_ = upgrader.Upgrade(ctx, handleWs)
 }
 
 func handleWs(conn *websocket.Conn) {
@@ -99,6 +128,19 @@ func handleWs(conn *websocket.Conn) {
 	}
 }
 
+func handleWriteWebSocketConn(conn *websocket.Conn) {
+	for {
+		outgoing := <-recvChannel
+		msg, err := json.Marshal(outgoing)
+		if err == nil {
+			err = conn.WriteMessage(1, msg)
+			if err != nil {
+				log.Fatal("Message send failed.")
+			}
+		}
+	}
+}
+
 func handleReadWebSocketConn(conn *websocket.Conn) {
 	for {
 		type_, msg, err := conn.ReadMessage()
@@ -107,21 +149,8 @@ func handleReadWebSocketConn(conn *websocket.Conn) {
 				payload := ASGIResponse{}
 				err := json.Unmarshal(msg, &payload)
 				if err == nil {
-					readChannel <- payload
+					sendChannel <- payload
 				}
-			}
-		}
-	}
-}
-
-func handleWriteWebSocketConn(conn *websocket.Conn) {
-	for {
-		outgoing := <-sendChannel
-		msg, err := json.Marshal(outgoing)
-		if err == nil {
-			err = conn.WriteMessage(1, msg)
-			if err != nil {
-				log.Fatal("Message send failed.")
 			}
 		}
 	}
@@ -136,14 +165,14 @@ func requestHandler(ctx *fasthttp.RequestCtx) {
 		"body":    string(ctx.Request.Body()),
 		"server":  "Sandman",
 	}
+	recvChannel <- toGo
+	response := <-sendChannel
 
-	sendChannel <- toGo
-	response := <-readChannel
 	ctx.SetStatusCode(response.Status)
-
 	//header := w.Header()
 	//for k, v := range val.headers {
 	//	header.Add(k, v)
 	//}
 	_, _ = fmt.Fprint(ctx, response.Body) // Request Body
+
 }

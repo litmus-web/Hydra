@@ -1,9 +1,11 @@
 import asyncio
 import json
 import sys
+import uvloop
 
 from aiohttp import ClientSession, WSMsgType, WSMessage
 
+uvloop.install()
 
 if len(sys.argv) > 1:
     _,  app, id_, auth = sys.argv

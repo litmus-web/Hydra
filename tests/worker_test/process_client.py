@@ -2,7 +2,6 @@ import asyncio
 import json
 import sys
 
-from io import StringIO
 from aiohttp import ClientSession, WSMsgType, WSMessage
 
 
