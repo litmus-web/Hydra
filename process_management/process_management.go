@@ -2,6 +2,7 @@ package process_management
 
 import (
 	"fmt"
+	"github.com/valyala/fasthttp/prefork"
 	"log"
 	"os"
 	"os/exec"
@@ -31,9 +32,10 @@ type TargetWorker struct {
 }
 
 func StartWorkers(amountProcesses int, target TargetApp) {
-	log.Println("Waiting for server to finish loading before booting workers")
+	if prefork.IsChild() {
+		log.Println("Waiting for server to finish loading before booting workers")
+	}
 	time.Sleep(500 * time.Millisecond)
-	log.Println("Starting Workers...")
 	for i := 1; i <= amountProcesses; i++ {
 		workerCfg := TargetWorker{
 			Target: target.Target,
@@ -44,8 +46,9 @@ func StartWorkers(amountProcesses int, target TargetApp) {
 		spawnedWorker := startWorker(workerCfg)
 		go handleNewWorker(spawnedWorker)
 	}
-
-	log.Println("Starting worker watcher")
+	if prefork.IsChild() {
+		log.Println("Starting worker watcher")
+	}
 	for {
 		newProcesses := ActiveWorkers{}
 		for i, worker := range activeProcesses.workers {

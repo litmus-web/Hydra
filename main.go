@@ -8,6 +8,8 @@ import (
 	"math/rand"
 	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fasthttp/websocket"
@@ -31,15 +33,52 @@ func randAuth(n int) string {
 	return string(b)
 }
 
-var recvChannel = make(chan map[string]interface{})
-var sendChannel = make(chan ASGIResponse)
-var authorization = randAuth(12)
+var recvChannel chan map[string]interface{} = nil
+var cache cacheMap
+var authorization = ""
+var ops int64
+var count = atomic.AddInt64(&ops, 1)
+
+type workers struct {
+	workers map[int]cacheMap
+	lock    sync.Mutex
+}
+
+func (w *workers) Get(key int) (cacheMap, bool) {
+	w.lock.Lock()
+	v, ok := w.workers[key]
+	w.lock.Unlock()
+	return v, ok
+}
+func (w *workers) Store(key int, val cacheMap) {
+	w.lock.Lock()
+	w.workers[key] = val
+	w.lock.Unlock()
+}
+
+type cacheMap struct {
+	internal map[int]ASGIResponse
+	lock     sync.Mutex
+}
+
+func (m *cacheMap) Get(key int) (ASGIResponse, bool) {
+	m.lock.Lock()
+	v, ok := m.internal[key]
+	m.lock.Unlock()
+	return v, ok
+}
+
+func (m *cacheMap) Store(key int, val ASGIResponse) {
+	m.lock.Lock()
+	m.internal[key] = val
+	m.lock.Unlock()
+}
 
 // Flags
 var (
 	target = flag.String(
 		"filepath",
-		"tests\\worker_test\\process_client.py",
+		"tests\\worker_test\\client.py",
 		"Specify the file containing the app")
 	app = flag.String(
 		"app",
@@ -48,12 +87,21 @@ var (
 )
 
 func main() {
+	// Setting vars
+	authorization = randAuth(12)
+	recvChannel = make(chan map[string]interface{})
+	cache = cacheMap{
+		internal: make(map[int]ASGIResponse),
+		lock:     sync.Mutex{},
+	}
+
 	flag.Parse()
 	target := process_management.TargetApp{
 		Target: *target,
 		App:    *app,
 		Auth:   authorization,
 	}
+	fmt.Println(target)
 	go process_management.StartWorkers(1, target) // Do not change, archive of old method
 
 	requestHandler := func(ctx *fasthttp.RequestCtx) {
@@ -66,12 +114,16 @@ func main() {
 	}
 
 	if runtime.GOOS == "windows" {
-		log.Println("Pre-Forking is not supported on windows runtime, Switching to standard mode.")
+		if prefork.IsChild() {
+			log.Println("Pre-Forking is not supported on windows runtime, Switching to standard mode.")
+		}
 		if err := fasthttp.ListenAndServe(":80", requestHandler); err != nil {
 			log.Fatal(err)
 		}
 	} else {
-		log.Println("Pre-Forking mode enabled.")
+		if prefork.IsChild() {
+			log.Println("Pre-Forking mode enabled.")
+		}
 		server := &fasthttp.Server{
 			Handler: requestHandler,
 			Name:    "Sandman",
@@ -91,9 +143,10 @@ type Identify struct {
 }
 
 type ASGIResponse struct {
-	headers map[string][]string `json:"-"`
-	Body    string              `json:"body"`
-	Status  int                 `json:"status"`
+	RequestId int                 `json:"request_id"`
+	headers   map[string][]string `json:"-"`
+	Body      string              `json:"body"`
+	Status    int                 `json:"status"`
 }
 
 var upgrader = websocket.FastHTTPUpgrader{}
@@ -149,7 +202,7 @@ func handleReadWebSocketConn(conn *websocket.Conn) {
 				payload := ASGIResponse{}
 				err := json.Unmarshal(msg, &payload)
 				if err == nil {
-					sendChannel <- payload
+					cache.Store(payload.RequestId, payload)
 				}
 			}
 		}
@@ -157,22 +210,31 @@ func handleReadWebSocketConn(conn *websocket.Conn) {
 }
 
 func requestHandler(ctx *fasthttp.RequestCtx) {
+	atomic.AddInt64(&count, 1)
+	key := int(count)
 	toGo := map[string]interface{}{
-		"method":  ctx.Method(),
-		"path":    ctx.Path(),
-		"remote":  ctx.RemoteAddr().String(),
-		"headers": ctx.Request.Header,
-		"body":    string(ctx.Request.Body()),
-		"server":  "Sandman",
+		"request_id": key,
+		"method":     ctx.Method(),
+		"path":       ctx.Path(),
+		"remote":     ctx.RemoteAddr().String(),
+		"headers":    ctx.Request.Header,
+		"body":       string(ctx.Request.Body()),
+		"server":     "Sandman",
 	}
 	recvChannel <- toGo
-	response := <-sendChannel
 
-	ctx.SetStatusCode(response.Status)
-	//header := w.Header()
-	//for k, v := range val.headers {
-	//	header.Add(k, v)
-	//}
-	_, _ = fmt.Fprint(ctx, response.Body) // Request Body
+	for {
+		v, ok := cache.Get(key)
+		if ok {
+			ctx.SetStatusCode(v.Status)
+			//header := w.Header()
+			//for k, v := range val.headers {
+			//	header.Add(k, v)
+			//}
+			_, _ = fmt.Fprint(ctx, v.Body) // Request Body
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 
 }

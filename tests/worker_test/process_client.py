@@ -48,6 +48,7 @@ class Server:
     @staticmethod
     async def on_message(ws, msg: dict) -> None:
         resp = {
+            "request_id": int(msg["request_id"]),
             "body": "hello world",
             "headers": {},
             "status": 200

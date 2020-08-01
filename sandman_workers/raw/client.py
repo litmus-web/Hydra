@@ -32,7 +32,7 @@ class Server:
                 if data.type == WSMsgType.CLOSED:
                     break
                 elif data.type == WSMsgType.PING:
-                    await self._ws.send_str(WSMessage(type=WSMsgType.PONG, data="Hello world!"))
+                    await self._ws.send_str("Hello World!")
                 elif data.type == WSMsgType.TEXT:
                     self._loop.create_task(self._handle_connections(data.data))
                 else:
@@ -47,7 +47,9 @@ class Server:
 
     @staticmethod
     async def on_message(ws, msg: dict) -> None:
+        print(msg["request_id"])
         resp = {
+            "request_id": int(msg["request_id"]),
             "body": "hello world",
             "headers": {},
             "status": 200

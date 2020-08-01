@@ -1,11 +1,9 @@
 import asyncio
 import json
 import sys
-import uvloop
 
 from aiohttp import ClientSession, WSMsgType, WSMessage
 
-uvloop.install()
 
 if len(sys.argv) > 1:
     _,  app, id_, auth = sys.argv
@@ -50,6 +48,7 @@ class Server:
     @staticmethod
     async def on_message(ws, msg: dict) -> None:
         resp = {
+            "request_id": int(msg["request_id"]),
             "body": "hello world",
             "headers": {},
             "status": 200

@@ -1,4 +1,4 @@
-version: '3'
+version: '2.1'
 
 services:
   sandman-test:
@@ -8,15 +8,18 @@ services:
       - .:/code
     ports:
       - "8080:8080"
+    cpuset: "6-9"
   uvicorn-test:
     build: .
-    command: gunicorn "uvicorn_py.uvicorn_server:app" -b "0.0.0.0:5050" -w 1 -k uvicorn.workers.UvicornWorker
+    command: gunicorn "uvicorn_py.uvicorn_server:app" -b "0.0.0.0:5050" -w 5 -k uvicorn.workers.UvicornWorker
     volumes:
       - .:/code
     ports:
       - "5050:5050"
+    cpuset: "2-5"
   benchmark:
     build: .
     command: python run.py
     volumes:
       - .:/code
+    cpuset: "0-1"
