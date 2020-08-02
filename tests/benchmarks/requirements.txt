@@ -1,4 +1,0 @@
-uvloop
-uvicorn
-gunicorn
-aiohttp[speedups]
