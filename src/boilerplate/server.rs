@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::io;
 use std::convert::Infallible;
 use std::str;
@@ -23,6 +23,7 @@ use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 
 use tokio_tungstenite::{tungstenite::protocol, WebSocketStream};
+use tokio_tungstenite::tungstenite;
 
 use serde_json;
 use serde::{Serialize, Deserialize};
@@ -37,7 +38,7 @@ static NEXT_USER_ID: AtomicUsize = AtomicUsize::new(1);
 /// 
 ///     - Workers: Set in a HashMap contained in a RC to allow us to use Default().
 ///     - Thread Safety: This is fine because the system is Single threaded.
-type Workers = Rc<HashMap<String, Result<mpsc::UnboundedSender<protocol::Message>, Error>>>;
+type Workers = RefCell<HashMap<String, mpsc::UnboundedSender<Result<protocol::Message, tungstenite::error::Error>>>>;
 type Cache = RefCell<HashMap<String, ASGIResponse>>;
 
 
@@ -196,10 +197,6 @@ async fn handle_ws_connection(
             let run_ws_task = async {
                 match ws.await {
                     Ok(ws) => {
-                        
-                        // Dud counter just for testing
-                        let mut counter: usize = 0;
-
                         // Split the ws connection into sender and reciever...
                         let (ws_tx, mut ws_rc) = ws.split();
                         let (tx, rx) = mpsc::unbounded_channel();
@@ -210,7 +207,7 @@ async fn handle_ws_connection(
                             }
                         }));
                         
-                        workers.insert(String::from("main"), tx);
+                        workers.borrow_mut().insert(String::from("main"), tx);
 
                         // Run it until something breaks or it stops normally.
                         while let Some(result) = ws_rc.next().await {
@@ -231,7 +228,7 @@ async fn handle_ws_connection(
                     }
                     Err(_e) => eprintln!("WS error"),
                 }
-                cache
+                (cache, workers)
             };
             tokio::task::spawn_local(run_ws_task);
             res
