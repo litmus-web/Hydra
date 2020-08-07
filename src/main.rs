@@ -1,17 +1,22 @@
+use std::env;
+use std::process;
+
 mod boilerplate;
 
 fn main() {
-    let target = boilerplate::Target{
-        file_path: String::from("./client.py"),
-        app: String::from("app"),
-    };
+    let pid = process::id();
+    let args: Vec<String> = env::args().collect();
+
+    let proc_id: usize = args[1].clone().parse().unwrap_or(1234);
+    let addr: String = args[2].clone();
+    let port: u16 = args[3].clone().parse().unwrap_or(8000);
 
     let server_config = boilerplate::server::Config{
-        addr: "127.0.0.1",
-        port: 8000
+        addr: addr,
+        port: port
     };
 
-    println!("[ Controller ]Starting Sandman http://{}:{}", server_config.addr, server_config.port);
-    boilerplate::create_forks(2, target, server_config)
+    println!("Starting Sandman worker with pid [{}]", pid);
+    boilerplate::create_boilerplate(proc_id, server_config)
 }
 
