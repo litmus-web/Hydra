@@ -51,7 +51,7 @@ pub struct Config {
     pub port: u16,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 struct OutGoingRequest {
     request_id: usize,
     method: String,
@@ -145,6 +145,13 @@ async fn handle_incoming(req: Request<Body>, workers: Workers, cache: Cache) -> 
         headers: Default::default(),
     };
 
+    let outgoing = serde_json::to_string(&outgoing).unwrap();
+
+    let _ = workers
+        .borrow()
+        .get(&String::from("main"))
+        .unwrap()
+        .send(Ok(protocol::Message::Text(outgoing)));
 
     Ok(
         Response::builder()
@@ -188,7 +195,7 @@ async fn handle_worker(req: Request<Body>, workers: Workers, cache: Cache) -> Re
 async fn handle_ws_connection(
     req: Request<Body>,
     workers: Workers,
-    mut cache: Cache,
+    cache: Cache,
     ) -> Result<Response<Body>, io::Error> {
 
     let res = match upgrade_connection(req).await {
