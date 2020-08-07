@@ -4,5 +4,5 @@
 
 
 # Sandman
-A experimental Go lang - Python hybrid server, this aims to improve general performance of frameworks without the need for UvLoop as a universal ASGI/WSGI/RAW http server.
+A experimental Rust lang - Python hybrid server, this aims to improve general performance of frameworks without the need for UvLoop as a universal ASGI/WSGI/RAW http server.
 
