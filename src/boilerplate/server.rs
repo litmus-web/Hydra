@@ -8,6 +8,7 @@ use std::str;
 
 use futures::prelude::*;
 use futures::{FutureExt, StreamExt};
+use futures::TryStreamExt; 
 
 use futures_util::future::join;
 
@@ -21,6 +22,7 @@ use hyper::http::Error;
 
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
+use tokio::time::{delay_for, Duration};
 
 use tokio_tungstenite::{tungstenite::protocol, WebSocketStream};
 use tokio_tungstenite::tungstenite;
@@ -58,13 +60,16 @@ struct OutGoingRequest {
     remote: String,
     path: String,
     headers: HashMap<String, String>,
+    version: String,
+    body: String,
+    query: String,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ASGIResponse {
     request_id: usize,
     status: u16,
-    headers: HashMap<String, String>,
+    headers: Vec<Vec<String>>,
     body: String
 }
 
@@ -87,7 +92,7 @@ async fn run_server(target_id: usize, server_config: Config) -> io::Result<()> {
     
     // Server binds, `?` makes the binder attach with SO_REUSEADDR, using unwrap() keeps the ports individual.
     let main_listener = TcpListener::bind(format!("{}:{}", server_config.addr, server_config.port)).await?;
-    let worker_listener = TcpListener::bind(format!("{}:{}", server_config.addr, target_id)).await.unwrap();
+    let worker_listener = TcpListener::bind(format!("127.0.0.1:{}", target_id)).await.unwrap();
 
     // Server service functions
     let main_service = make_service_fn(move |_| {
@@ -134,15 +139,35 @@ async fn run_server(target_id: usize, server_config: Config) -> io::Result<()> {
 ///
 ///  Main area where all incoming requests get sent.
 ///
-async fn handle_incoming(req: Request<Body>, workers: Workers, cache: Cache) -> Result<Response<Body>, Error> {
+async fn handle_incoming(mut req: Request<Body>, workers: Workers, cache: Cache) -> Result<Response<Body>, Error> {
     let req_id = NEXT_USER_ID.fetch_add(1, Ordering::Relaxed);
+
+    let all_body: Vec<u8> = req.body_mut()
+                                .try_fold(Vec::new(), |mut data, chunk| async move {
+                                    data.extend_from_slice(&chunk);
+                                    Ok(data)
+                                })
+                                .await
+                                .unwrap_or(vec![]);
+    
+    let headers: HashMap<String, String> = req
+        .headers_mut()
+        .drain()
+        .map(|part| {(
+                 String::from(part.0.unwrap().as_str()),
+                 String::from(part.1.to_str().unwrap_or(""))
+             )})
+        .collect();
 
     let outgoing = OutGoingRequest {
         request_id: req_id,
         method: String::from(req.method().as_str()),
         remote: String::from(req.uri().host().unwrap_or("127.0.0.1")),
         path: req.uri().path().to_string(),
-        headers: Default::default(),
+        headers: headers,
+        version: String::from("HTTP/1.1"),
+        body: String::from_utf8(all_body.clone()).unwrap_or(String::from("")),
+        query: String::from(req.uri().query().unwrap())
     };
     let outgoing = serde_json::to_string(&outgoing).unwrap();
 
@@ -153,23 +178,44 @@ async fn handle_incoming(req: Request<Body>, workers: Workers, cache: Cache) -> 
             .unwrap()
             .send(Ok(protocol::Message::Text(outgoing)));
 
-        Ok(
-            Response::builder()
-                .status(StatusCode::OK)
-                .body("owo Found".into())
-                .unwrap()
-        )
+        let mut time_out_count: u16 = 0;
+        loop {
+            if cache.borrow().get(&req_id).is_some() { break }
+            delay_for(Duration::from_micros(15)).await;
+            if time_out_count >= 200 { break }
+            else { time_out_count += 1 }
+        }
+        
+        match cache.borrow_mut().remove(&req_id) {
+            Some(asgi_resp) => {
+                let headers: Vec<Vec<String>> = asgi_resp.headers.clone();
+                let status: u16 = asgi_resp.status;
+    
+                let mut resp = Response::builder()
+                    .status(StatusCode::from_u16(status).unwrap());
+    
+                for v in headers.iter() {
+                    resp = resp.header(v[0].as_str(), v[1].as_str()) 
+                }
+                resp.body(asgi_resp.clone().body.into())
+            },
+            _ => {
+                let resp = Response::builder()
+                    .status(StatusCode::from_u16(503).unwrap())
+                    .body("Server took too long to respond.".into()).unwrap();  
+                eprintln!("Server took too long to respond., Req Id: {}", req_id);
+                Ok(resp)
+            }
+        } 
     } else {
+        eprintln!("Request came in with no active Python Workers, Req Id: {}", req_id);
         Ok(
             Response::builder()
                 .status(StatusCode::from_u16(503).unwrap())
                 .body("No workers active".into())
                 .unwrap()
         )
-    }
-    
-
-    
+    }  
 }
 
 
@@ -237,10 +283,9 @@ async fn handle_ws_connection(
                                 },
                                 _ => String::from("None")
                             };
-
+                            
                             let outgoing: ASGIResponse = serde_json::from_str(msg.as_str()).unwrap();
-                            let mut borred = cache.borrow_mut();
-                            borred.insert(outgoing.clone().request_id, outgoing);
+                            cache.borrow_mut().insert(outgoing.clone().request_id, outgoing);
                         }
                     }
                     Err(_e) => eprintln!("WS error"),
