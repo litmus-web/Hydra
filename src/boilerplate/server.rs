@@ -38,8 +38,8 @@ static NEXT_USER_ID: AtomicUsize = AtomicUsize::new(1);
 /// 
 ///     - Workers: Set in a HashMap contained in a RC to allow us to use Default().
 ///     - Thread Safety: This is fine because the system is Single threaded.
-type Workers = RefCell<HashMap<String, mpsc::UnboundedSender<Result<protocol::Message, tungstenite::error::Error>>>>;
-type Cache = RefCell<HashMap<String, ASGIResponse>>;
+type Workers = Rc<RefCell<HashMap<String, mpsc::UnboundedSender<Result<protocol::Message, tungstenite::error::Error>>>>>;
+type Cache = Rc<RefCell<HashMap<usize, ASGIResponse>>>;
 
 
 ///
@@ -51,7 +51,7 @@ pub struct Config {
     pub port: u16,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct OutGoingRequest {
     request_id: usize,
     method: String,
@@ -62,7 +62,7 @@ struct OutGoingRequest {
 
 #[derive(Clone, Serialize, Deserialize)]
 struct ASGIResponse {
-    request_id: String,
+    request_id: usize,
     status: u16,
     headers: HashMap<String, String>,
     body: String
@@ -139,26 +139,37 @@ async fn handle_incoming(req: Request<Body>, workers: Workers, cache: Cache) -> 
 
     let outgoing = OutGoingRequest {
         request_id: req_id,
-        method: req.method().to_string(),
-        remote: String::from(req.uri().host().unwrap()),
+        method: String::from(req.method().as_str()),
+        remote: String::from(req.uri().host().unwrap_or("127.0.0.1")),
         path: req.uri().path().to_string(),
         headers: Default::default(),
     };
-
     let outgoing = serde_json::to_string(&outgoing).unwrap();
 
-    let _ = workers
-        .borrow()
-        .get(&String::from("main"))
-        .unwrap()
-        .send(Ok(protocol::Message::Text(outgoing)));
+    if workers.borrow().get(&String::from("main")).is_some() {
+        let _ = workers
+            .borrow()
+            .get(&String::from("main"))
+            .unwrap()
+            .send(Ok(protocol::Message::Text(outgoing)));
 
-    Ok(
-        Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .body("Not Found".into())
-        .unwrap()
-    )
+        Ok(
+            Response::builder()
+                .status(StatusCode::OK)
+                .body("owo Found".into())
+                .unwrap()
+        )
+    } else {
+        Ok(
+            Response::builder()
+                .status(StatusCode::from_u16(503).unwrap())
+                .body("No workers active".into())
+                .unwrap()
+        )
+    }
+    
+
+    
 }
 
 
@@ -230,7 +241,6 @@ async fn handle_ws_connection(
                             let outgoing: ASGIResponse = serde_json::from_str(msg.as_str()).unwrap();
                             let mut borred = cache.borrow_mut();
                             borred.insert(outgoing.clone().request_id, outgoing);
-
                         }
                     }
                     Err(_e) => eprintln!("WS error"),
