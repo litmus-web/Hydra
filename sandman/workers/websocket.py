@@ -245,20 +245,3 @@ class AutoShardedWorker:
             task: asyncio.Task = task
             if not task.done() and not task.cancelled():
                 task.cancel()
-
-
-# Testing
-async def main():
-    test = WebsocketShard(
-        shard_id=0,
-        binding_addr="ws://127.0.0.1:12232/workers",
-        request_callback=lambda x: print(x),
-        msg_callback=lambda x: print(x)
-    )
-    await test.connect()
-
-
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    asyncio.run(main())
-
