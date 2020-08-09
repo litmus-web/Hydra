@@ -1,7 +1,5 @@
 import typing
 import asyncio
-import threading
-import time
 import logging
 
 from concurrent.futures import ThreadPoolExecutor
@@ -33,7 +31,6 @@ class WindowsWorker(Worker):
         )
 
         # Process and thread management for win api
-        self._lock = threading.Lock()
         self._active_process: typing.Optional[Popen[str]] = None
         self._shutdown_thread = False
 
@@ -54,8 +51,7 @@ class WindowsWorker(Worker):
             await asyncio.sleep(0.5)
 
     def force_shutdown_unsafe(self) -> None:
-        with self._lock:
-            self._active_process.terminate()
+        self._active_process.terminate()
 
     async def _spawn_rust(self) -> None:
         asyncio.create_task(self.manage_subprocess())
