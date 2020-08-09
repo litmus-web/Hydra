@@ -275,6 +275,7 @@ async fn handle_ws_connection(
                         while let Some(result) = ws_rc.next().await {
                             let msg = match result {
                                 Ok(protocol::Message::Text(text)) => text,
+                                Ok(protocol::Message::Binary(text)) => String::from_utf8(text).unwrap(),
                                 Err(e) => {
                                     eprintln!("websocket error {}", e);
                                     break;

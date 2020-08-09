@@ -3,14 +3,12 @@ import asyncio
 import typing
 import logging
 
-try:
-    import orjson as json
-except ImportError:
-    import json
-
 from typing import Any
 from dataclasses import dataclass
 from aiohttp import WSMessage, WSMsgType, ClientConnectionError
+
+from .responses import dumps_data, load_data, JSONDecodeError
+
 
 __all__ = ["WebsocketShard", "AutoShardedWorker", "InternalResponses"]
 
@@ -136,13 +134,23 @@ class WebsocketShard:
             A websocket message object with the type TEXT.
         """
         try:
-            data = json.loads(msg.data)
-            await self.req_callback(ws, data)
-        except json.JSONDecodeError:
+            data = load_data(msg.data)
+        except JSONDecodeError:
             if asyncio.iscoroutinefunction(self.msg_callback):
-                await self.msg_callback(ws, msg.data)
-            else:
-                self.msg_callback(ws, msg.data)
+                return await self.msg_callback(ws, msg.data)
+            return self.msg_callback(ws, msg.data)
+
+        try:
+            await self.req_callback(ws, data)
+        except Exception as err:
+            data = {
+                "request_id": data["request_id"],
+                "status": 503,
+                "headers": [["hello", "world"]],
+                "body": "A internal server error has occurred."
+            }
+            await ws.send_bytes(dumps_data(data))
+            raise err
 
 
 class AutoShardedWorker:

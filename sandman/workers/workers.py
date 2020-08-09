@@ -1,19 +1,15 @@
-import logging
 import typing
-import sys
-import os
 import socket
 import asyncio
 import inspect
 import importlib
 import argparse
 
-from subprocess import Popen, PIPE
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
-from aiohttp import ClientWebSocketResponse, WSMessage
+from aiohttp import ClientWebSocketResponse
 
 from .websocket import AutoShardedWorker
+from .responses import dumps_data
 
 
 parser = argparse.ArgumentParser()
@@ -85,7 +81,13 @@ class Worker:
         raise NotImplementedError()
 
     async def _on_http_request(self, ws: ClientWebSocketResponse, msg: dict):
-        print(msg)
+        data = {
+            "request_id": msg["request_id"],
+            "status": 200,
+            "headers": (),
+            "body": "hello world"
+        }
+        await ws.send_bytes(dumps_data(data))
 
     async def _on_internal_message(self, ws: ClientWebSocketResponse, msg: str):
         pass
