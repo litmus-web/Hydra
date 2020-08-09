@@ -1,6 +1,6 @@
 
 
-[![CodeFactor](https://www.codefactor.io/repository/github/project-dream-weaver/sandman/badge/master)](https://www.codefactor.io/repository/github/project-dream-weaver/sandman/overview/master)
+[![CodeFactor](https://www.codefactor.io/repository/github/project-dream-weaver/sandman/badge)](https://www.codefactor.io/repository/github/project-dream-weaver/sandman)
 
 
 # Sandman
