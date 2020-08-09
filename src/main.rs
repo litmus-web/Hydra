@@ -12,11 +12,11 @@ fn main() {
     let port: u16 = args[3].clone().parse().unwrap_or(8000);
 
     let server_config = boilerplate::server::Config{
-        addr: addr,
-        port: port
+        addr,
+        port
     };
 
-    println!("Starting Sandman worker with pid [{}]", pid);
+    println!("[{}] Starting Sandman worker binding to ws://127.0.0.1:{}/workers", pid, proc_id);
     boilerplate::create_boilerplate(proc_id, server_config)
 }
 

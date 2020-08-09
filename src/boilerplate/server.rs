@@ -167,7 +167,7 @@ async fn handle_incoming(mut req: Request<Body>, workers: Workers, cache: Cache)
         headers: headers,
         version: String::from("HTTP/1.1"),
         body: String::from_utf8(all_body.clone()).unwrap_or(String::from("")),
-        query: String::from(req.uri().query().unwrap())
+        query: String::from(req.uri().query().unwrap_or(""))
     };
     let outgoing = serde_json::to_string(&outgoing).unwrap();
 
@@ -203,7 +203,7 @@ async fn handle_incoming(mut req: Request<Body>, workers: Workers, cache: Cache)
                 let resp = Response::builder()
                     .status(StatusCode::from_u16(503).unwrap())
                     .body("Server took too long to respond.".into()).unwrap();  
-                eprintln!("Server took too long to respond., Req Id: {}", req_id);
+                eprintln!("Server took too long to respond, Req Id: {}", req_id);
                 Ok(resp)
             }
         } 
@@ -230,7 +230,6 @@ async fn handle_workers_incoming(
     workers: Workers,
     cache: Cache
     ) -> Result<Response<Body>, Error> {
-
     match req.uri().path() {
         "/workers" => Ok(handle_worker(req, workers, cache).await),
         _ => {
@@ -254,7 +253,6 @@ async fn handle_ws_connection(
     workers: Workers,
     cache: Cache,
     ) -> Result<Response<Body>, io::Error> {
-
     let res = match upgrade_connection(req).await {
         Err(res) => res,
         Ok((res, ws)) => {
