@@ -1,13 +1,12 @@
 import typing
 import asyncio
-import inspect
 import importlib
 
 from aiohttp import ClientWebSocketResponse
 from .websocket import AutoShardedWorker
 from .responses import dumps_data
 
-from .. import find_free_port
+from ..utils.helpers import find_free_port
 
 
 def _get_app(app_path: str) -> typing.Callable:
@@ -18,10 +17,6 @@ def _get_app(app_path: str) -> typing.Callable:
     if app is None:
         raise ImportError("No app named {} in file {}".format(app_name, fp))
     return app
-
-
-def _get_path(app: typing.Callable) -> str:
-    return inspect.getfile(app)
 
 
 class Worker:
@@ -39,7 +34,6 @@ class Worker:
         self._app = _get_app(app_path=app)
 
         self._free_port = find_free_port()
-        self._file_path = _get_path(self._app)
         self._exe_path = sandman_path
         self._clear_to_shard = False
 

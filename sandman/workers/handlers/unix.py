@@ -1,6 +1,5 @@
 import typing
 
-from asyncio import subprocess
 from asyncio.subprocess import Process
 
 from ..workers import Worker
