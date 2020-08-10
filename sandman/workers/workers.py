@@ -67,12 +67,3 @@ class Worker:
 
     async def _on_internal_message(self, ws: ClientWebSocketResponse, msg: str):
         pass
-
-
-
-
-
-
-
-
-
