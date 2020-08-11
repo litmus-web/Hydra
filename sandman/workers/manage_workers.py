@@ -6,7 +6,7 @@ import sys
 from asyncio.subprocess import Process
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from subprocess import Popen, PIPE, STDOUT
+from subprocess import Popen, PIPE
 
 
 platform = sys.platform
@@ -29,6 +29,7 @@ class WinProcess:
             stdout=PIPE,
             stderr=PIPE
         )
+        await asyncio.sleep(1)
         self._pid = self._active_process.pid
         return self._active_process.pid
 
@@ -134,6 +135,7 @@ class ProcessManager:
     async def _spawn_workers(self) -> None:
         for _ in range(self._num_workers):
             proc = self._proc_class(self._path)
+            print(proc)
             await proc.start()
             self._active_workers.append(proc)
 

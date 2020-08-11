@@ -86,16 +86,13 @@ class WindowsWorker(Worker):
 
                 if out.replace(b'\n', b'') != b'':
                     if b"is not recognized as an internal or external command" in out:
-                        with self._lock:
-                            self._active_process.kill()
+                        self._active_process.kill()
                         raise RuntimeError(out.decode())
                     print("[ %s ][ Sandman Message ] %s" % (
                         str(datetime.now())[:-2], out.decode().replace("\n", "")))
                 await asyncio.sleep(0.2)
         self._clear_to_shard = False
-
-        with self._lock:
-            self._active_process.kill()
+        self._active_process.kill()
 
     async def read_active_process(self, pool: ThreadPoolExecutor):
         return await asyncio.get_event_loop().run_in_executor(
