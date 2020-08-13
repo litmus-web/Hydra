@@ -1,2 +1,2 @@
-uvloop
 aiohttp[speedups]
+uvloop
