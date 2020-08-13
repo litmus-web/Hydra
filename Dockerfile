@@ -2,7 +2,7 @@ FROM golang as builder
 
 RUN mkdir /sandman
 WORKDIR /sandman
-COPY .. /sandman/
+COPY . /sandman/
 
 RUN go get "github.com/valyala/fasthttp"
 RUN go get "github.com/fasthttp/websocket"
