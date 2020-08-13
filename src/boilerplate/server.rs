@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::io;
 use std::convert::Infallible;
 use std::str;
+use std::net::Ipv4Addr;
 
 use futures::prelude::*;
 use futures::{FutureExt, StreamExt};
@@ -20,9 +21,9 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{self, Body, Request, Response, StatusCode};
 use hyper::http::Error;
 
-use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio::time::{delay_for, Duration};
+use tokio::net::TcpListener;
 
 use tokio_tungstenite::{tungstenite::protocol, WebSocketStream};
 use tokio_tungstenite::tungstenite;
@@ -79,7 +80,8 @@ struct ASGIResponse {
 ///  Runners for main function.
 ///
 pub async fn run(target_id: usize, server_config: Config)  {     
-    let _ = run_server(target_id, server_config).await;
+    let err = run_server(target_id, server_config).await;
+    eprintln!("{:?}", err)
 }
 
 async fn run_server(target_id: usize, server_config: Config) -> io::Result<()> {
@@ -195,6 +197,7 @@ async fn handle_incoming(mut req: Request<Body>, workers: Workers, cache: Cache)
                     .status(StatusCode::from_u16(status).unwrap());
     
                 for v in headers.iter() {
+                    println!("{:?}", v);
                     resp = resp.header(v[0].as_str(), v[1].as_str()) 
                 }
                 resp.body(asgi_resp.clone().body.into())

@@ -41,10 +41,11 @@ class WinProcess:
 
     async def logs(self):
         with ThreadPoolExecutor() as pool:
-            while self._active_process.poll() is None:
+            while True: # self._active_process.poll() is None:
                 try:
                     msg = await asyncio.wait_for(self._get_logs(pool), timeout=5)
-                    print(msg)
+                    if msg != b'':
+                        print(msg)
                 except asyncio.TimeoutError:
                     break
                 await asyncio.sleep(0.1)

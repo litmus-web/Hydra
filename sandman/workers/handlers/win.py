@@ -7,6 +7,9 @@ from datetime import datetime
 from subprocess import Popen, PIPE, STDOUT
 
 from ..workers import Worker
+from ...adapters.asgi import ASGIAdapter
+from ...adapters.wsgi import WSGIAdapter
+from ...adapters.raw import RawAdapter
 
 
 logger = logging.getLogger("Sandman-Worker")
@@ -16,6 +19,7 @@ class WindowsWorker(Worker):
     def __init__(
             self,
             app: str,
+            adapter: typing.Union[WSGIAdapter, ASGIAdapter, RawAdapter],
             host_addr: str = "127.0.0.1",
             port: int = 8000,
             shard_count: int = 1,
@@ -27,7 +31,8 @@ class WindowsWorker(Worker):
             port,
             shard_count,
             sandman_path,
-            self.shard_manager_shutdown
+            self.shard_manager_shutdown,
+            adapter
         )
 
         # Process and thread management for win api
