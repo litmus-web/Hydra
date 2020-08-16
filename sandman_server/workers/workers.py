@@ -1,15 +1,16 @@
 import typing
-import asyncio
 import importlib
+import logging
 
 from aiohttp import ClientWebSocketResponse
 
 from .websocket import AutoShardedWorker
 from .responses import dumps_data
-from ..utils.helpers import find_free_port
 from ..adapters.asgi import ASGIAdapter
 from ..adapters.wsgi import WSGIAdapter
 from ..adapters.raw import RawAdapter
+
+logger = logging.getLogger("Sandman-Worker")
 
 
 def _get_app(app_path: str) -> typing.Callable:
@@ -26,41 +27,28 @@ class Worker:
     def __init__(
             self,
             app: str,
-            host_addr: str,
             port: int,
             shard_count: int,
-            sandman_path: str,
-            failed_shard_callback: typing.Callable,
             adapter: typing.Union[WSGIAdapter, ASGIAdapter, RawAdapter],
     ):
-        self.host_addr = host_addr
-        self.port = port
         self._app = _get_app(app_path=app)
 
-        self._free_port = 1234 # find_free_port()
-        self._exe_path = sandman_path
-        self._clear_to_shard = False
+        self._free_port = port
 
         worker_addr = "ws://127.0.0.1:{}/workers".format(self._free_port)
+        logger.info("Binding to {}".format(worker_addr))
         self._shard_count = shard_count
         self.shard_manager = AutoShardedWorker(
             binding_addr=worker_addr,
             request_callback=self._on_http_request,
             msg_callback=self._on_internal_message,
-            shard_count=shard_count,
-            failed_callback=failed_shard_callback
+            shard_count=shard_count
         )
 
         self._adapter = adapter
 
     async def run(self):
-        #await self._spawn_rust()
-        #await asyncio.sleep(1)
-        #if self._clear_to_shard:
-            await self.shard_manager.run()
-
-    async def _spawn_rust(self):
-        raise NotImplementedError()
+        await self.shard_manager.run()
 
     async def _on_http_request(self, ws: ClientWebSocketResponse, msg: dict):
         outgoing = await self._adapter(self._app, msg)
