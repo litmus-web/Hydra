@@ -13,11 +13,10 @@ import (
 	"../prefork"
 )
 
-
 ///
 ///  Starting Areas, spawns all the servers
 ///
-func StartServers(mainHost string, workerPort int)  {
+func StartServers(mainHost string, workerPort int) {
 	go startWorkerServer(workerPort)
 	startMainServer(mainHost)
 }
@@ -32,8 +31,7 @@ func startWorkerServer(workerPort int) {
 		}
 	}
 
-
-	if err := fasthttp.ListenAndServe(fmt.Sprintf(":%v", workerPort), requestHandler); err != nil {
+	if err := fasthttp.ListenAndServe(fmt.Sprintf("127.0.0.1:%v", workerPort), requestHandler); err != nil {
 		panic(err)
 	}
 }
@@ -43,12 +41,12 @@ func startMainServer(mainHost string) {
 		Handler: anyHTTPHandler,
 	}
 	preforkServer := prefork.New(server)
+
+	fmt.Printf("Server started server on http://%s\n", mainHost)
 	if err := preforkServer.ListenAndServe(mainHost); err != nil {
 		panic(err)
 	}
 }
-
-
 
 ///
 ///  General variables and constants for communication between systems.
@@ -59,33 +57,33 @@ var upgrader = websocket.FastHTTPUpgrader{
 }
 
 var toPythonChan = make(chan OutGoingRequest)
-var cache = make(map[uint64]ASGIResponse)
+var cache = make(map[uint64]chan ASGIResponse)
 var cacheLock = sync.RWMutex{}
 
 var count uint64 = 0
-
 
 ///
 ///  General Structs for communication between systems.
 ///
 type OutGoingRequest struct {
-	RequestId uint64    			`json:"request_id"`
-	Method    string 				`json:"method"`
-	Remote    string				`json:"remote"`
-	Path      string				`json:"path"`
-	Headers   map[string]string		`json:"headers"`
-	Version   string				`json:"version"`
-	Body      string				`json:"body"`
-	Query     string				`json:"query"`
+	RequestId uint64            `json:"request_id"`
+	Method    string            `json:"method"`
+	Remote    string            `json:"remote"`
+	Path      string            `json:"path"`
+	Headers   map[string]string `json:"headers"`
+	Version   string            `json:"version"`
+	Body      string            `json:"body"`
+	Query     string            `json:"query"`
 }
 
 type ASGIResponse struct {
-	RequestId uint64	`json:"request_id"`
-	Status int			`json:"status"`
-	Headers [][]string	`json:"headers"`
-	Body string			`json:"body"`
+	RequestId uint64     `json:"request_id"`
+	Type      string     `json:"type"`
+	Status    int        `json:"status"`
+	Headers   [][]string `json:"headers"`
+	Body      string     `json:"body"`
+	MoreBody  bool       `json:"more_body"`
 }
-
 
 ///
 ///  Main area where all incoming requests get sent.
@@ -103,33 +101,41 @@ func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
 		Body:      "",
 		Query:     ctx.QueryArgs().String(),
 	}
-	toPythonChan<-toGo
+	toPythonChan <- toGo
 
-	start := time.Now()
+	incomingChan := make(chan ASGIResponse)
+
+	cacheLock.Lock()
+	cache[count] = incomingChan
+	cacheLock.Unlock()
+
 	for {
-		cacheLock.RLock()
-		res, found := cache[count]
-		cacheLock.RUnlock()
-		if found {
-			for _, val := range res.Headers {
-				ctx.Response.Header.Set(val[0], val[1])
-			}
-			ctx.SetStatusCode(res.Status)
-			fmt.Fprintln(ctx, res.Body)
-			break
-		} else {
-			delta := time.Now().Sub(start)
-			if delta.Seconds() > 20 {
-				ctx.SetStatusCode(503)
-				fmt.Fprintln(ctx, "res.Body")
+		workerResponse := <-incomingChan
+		if workerResponse.Type == "response.start" {
+			writeStart(ctx, workerResponse)
+		} else if workerResponse.Type == "response.body" {
+			writeBody(ctx, workerResponse)
+			if !workerResponse.MoreBody {
 				break
 			}
 		}
-		time.Sleep(12 * time.Microsecond)
+		time.Sleep(5 * time.Microsecond)
 	}
 }
 
+func writeStart(ctx *fasthttp.RequestCtx, resp ASGIResponse) {
+	ctx.SetStatusCode(resp.Status)
+	for _, val := range resp.Headers {
+		ctx.Response.Header.Set(val[0], val[1])
+	}
+}
 
+func writeBody(ctx *fasthttp.RequestCtx, resp ASGIResponse) {
+	_, err := fmt.Fprintln(ctx, resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
 
 ///
 ///  This is the worker area, responsible for upgrading the WS connection
@@ -151,9 +157,9 @@ func handleRead(conn *websocket.Conn) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		cacheLock.Lock()
-		cache[incoming.RequestId] = incoming
-		cacheLock.Unlock()
+		cacheLock.RLock()
+		cache[incoming.RequestId] <- incoming
+		cacheLock.RUnlock()
 	}
 }
 
