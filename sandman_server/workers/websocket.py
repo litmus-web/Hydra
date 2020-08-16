@@ -9,7 +9,6 @@ from aiohttp import WSMessage, WSMsgType, ClientConnectionError
 
 from .responses import dumps_data, load_data, JSONDecodeError
 
-
 __all__ = ["WebsocketShard", "AutoShardedWorker", "InternalResponses"]
 
 logger = logging.getLogger("Sandman-Shard")
@@ -146,7 +145,7 @@ class WebsocketShard:
             data = {
                 "request_id": data["request_id"],
                 "status": 503,
-                "headers": [["hello", "world"]],
+                "headers": [],
                 "body": "A internal server error has occurred."
             }
             await ws.send_bytes(dumps_data(data))
@@ -170,20 +169,19 @@ class AutoShardedWorker:
         The amount of shards / sessions the worker process should open with Sandman.
         Defaults to 1 which is generally fine but larger messages may require more.
     """
+
     def __init__(
             self,
             binding_addr: str,
-            failed_callback: asyncio.coroutine,
             request_callback: typing.Union[typing.Coroutine[Any, Any, None], typing.Callable],
             msg_callback: typing.Union[typing.Coroutine[Any, Any, None], typing.Callable],
-            shard_count: int=1,
-            shard_restart_limit: typing.Optional[int]=None,
+            shard_count: int = 1,
+            shard_restart_limit: typing.Optional[int] = None,
     ):
         self.shard_count = shard_count
         self.binding_addr = binding_addr
         self.req_callback = request_callback
         self.msg_callback = msg_callback
-        self.failed_callback = failed_callback
 
         if shard_restart_limit is None:
             self.shard_restart_limit = shard_count * 2
@@ -226,7 +224,6 @@ class AutoShardedWorker:
                         break
                     elif res == InternalResponses.CONNECTION_FAILED:
                         await self._shutdown_all()
-                        await self.failed_callback()
                         raise ClientConnectionError("Worker failed to Connect to WS")
                     else:
                         self._create_shard(shard_id=shard_id)
@@ -261,4 +258,3 @@ async def main():
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     asyncio.run(main())
-
