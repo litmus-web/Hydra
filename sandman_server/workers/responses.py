@@ -12,5 +12,6 @@ except ImportError:
     def dumps_data(data):
         return json.dumps(data).encode()
 
+
 def load_data(data: str):
     return json.loads(data)
