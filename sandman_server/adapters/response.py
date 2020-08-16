@@ -5,14 +5,14 @@ class OutGoingResponse:
     def __init__(
             self,
             req_id: int,
-            status: Optional[int]=None,
-            headers: Optional[Union[list, tuple]]=None,
-            body: Optional[str]=None
+            status: Optional[int] = None,
+            headers: Optional[Union[list, tuple]] = None,
+            body: Optional[str] = None
     ):
         if req_id is not None:
             assert type(req_id) == int, "req_id type is not int"  # The server only really cares about this type.
         if status is not None:
-            assert type(status) == int, "status type is not int"    # The server only really cares about this type.
+            assert type(status) == int, "status type is not int"  # The server only really cares about this type.
 
         self.req_id = req_id
         self.status = status
