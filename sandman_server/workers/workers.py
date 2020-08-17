@@ -5,7 +5,6 @@ import logging
 from aiohttp import ClientWebSocketResponse
 
 from .websocket import AutoShardedWorker
-from .responses import dumps_data
 from ..adapters.asgi import ASGIAdapter
 from ..adapters.wsgi import WSGIAdapter
 from ..adapters.raw import RawAdapter
@@ -51,8 +50,7 @@ class Worker:
         await self.shard_manager.run()
 
     async def _on_http_request(self, ws: ClientWebSocketResponse, msg: dict):
-        outgoing = await self._adapter(self._app, msg)
-        await ws.send_bytes(dumps_data(outgoing.to_dict()))
+        await self._adapter(ws, self._app, msg)
 
     async def _on_internal_message(self, ws: ClientWebSocketResponse, msg: str):
         pass
