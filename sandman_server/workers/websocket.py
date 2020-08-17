@@ -2,20 +2,22 @@ import aiohttp
 import asyncio
 import typing
 import logging
+import os
 
 from typing import Any
 from dataclasses import dataclass
 from aiohttp import WSMessage, WSMsgType, ClientConnectionError
 
-from .responses import dumps_data, load_data, JSONDecodeError
+from ..helpers import dumps_data, load_data, JSONDecodeError
 
 __all__ = ["WebsocketShard", "AutoShardedWorker", "InternalResponses"]
 
 logger = logging.getLogger("Sandman-Shard")
+PID = os.getpid()
 
 
-def log_info(id_, msg, *args):
-    logger.info("[ Worker Shard %s ] %s", id_, msg, *args)
+def log_info(msg, *args):
+    logger.info("[ Worker %s ][ Worker Shard ] %s", "{}".format(PID).ljust(5), msg, *args)
 
 
 class ConnectionFailed:
@@ -71,7 +73,7 @@ class WebsocketShard:
     async def connect(self) -> typing.Union[ConnectionFailed, ClosedNaturally, ClosedAbnormally]:
         """Connects to the worker socket on Sandman and begins receiving requests"""
         self.session = aiohttp.ClientSession()
-        log_info(self.shard_id, "Shard initiated client session")
+        log_info("Shard initiated client session")
         try:
             async with self.session.ws_connect(self.binding_addr) as ws:
                 await self.on_connect(ws)
@@ -99,7 +101,7 @@ class WebsocketShard:
         """Coroutine called when a connection has been established between the
         worker shard and Sandman.
         """
-        log_info(self.shard_id, "Shard has connected to Sandman")
+        log_info("Shard has connected to Sandman")
 
     async def on_error(self, ws, _: WSMessage) -> None:
         """Coroutine called when a connection has been interrupted by a error,
@@ -119,7 +121,7 @@ class WebsocketShard:
         """
         await ws.close()
         await self.session.close()
-        log_info(self.shard_id, "websocket has closed, shutting down shard.")
+        log_info("websocket has closed, shutting down shard.")
 
     async def on_message(self, ws, msg: WSMessage) -> None:
         """Coroutine called when a connection has been closed by Sandman directly,
@@ -224,7 +226,8 @@ class AutoShardedWorker:
                         break
                     elif res == InternalResponses.CONNECTION_FAILED:
                         await self._shutdown_all()
-                        raise ClientConnectionError("Worker failed to Connect to WS")
+                        raise ClientConnectionError(
+                            "Worker failed to Connect to WS on addr: {}".format(self.binding_addr))
                     else:
                         self._create_shard(shard_id=shard_id)
                         logger.warning(
