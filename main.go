@@ -1,24 +1,24 @@
 package main
 
 import (
-	"./server"
-	"./workers"
 	"flag"
 	"log"
 	"net"
+	"runtime"
+
+	"./prefork"
+	"./server"
+	"./workers"
 )
 
 // Flags
 var (
-	// Basic Settings
-	isChild = flag.Bool(
-		"child", false, "Is a child process")
 	host = flag.String(
 		"host", "127.0.0.1:8000", "The address for the server to bind to.")
 	app = flag.String(
-		"app", "main:app", "The WSGI, ASGI or raw app name and path, e.g 'my_server:app'")
+		"app", "", "The WSGI, ASGI or raw app name and path, e.g 'my_server:app'")
 	adapter = flag.String(
-		"adapter", "raw", "Adapter type to use. (ASGI, WSGI, RAW)")
+		"adapter", "", "Adapter type to use. (ASGI, WSGI, RAW)")
 	//shardsPerProc = flag.Int(
 	//	"shardsperproc", 1, "The amount of shards per process to use.")
 	workerCount = flag.Int(
@@ -54,13 +54,20 @@ var (
 
 func main() {
 	flag.Parse()
-	println(*isChild)
+
+	if *app == "" {
+		log.Fatalln("--app is a required flag, e.g 'myfile:app'")
+	} else if *adapter == "" {
+		log.Fatalln("--adapter is a required flag, e.g 'asgi'")
+	}
+
+	runtime.GOMAXPROCS(*workerCount)
 	workerPort, err := getFreePort()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	go workers.StartChildren(*isChild, *workerCount, *app, *adapter, workerPort, 1)
+	go workers.StartChildren(prefork.IsChild(), *app, *adapter, workerPort, 1)
 	server.StartServers(*host, workerPort)
 }
 
