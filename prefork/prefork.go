@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"time"
 
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/reuseport"
@@ -22,6 +23,7 @@ var (
 	defaultLogger = Logger(log.New(os.Stderr, "", log.LstdFlags))
 	// ErrOverRecovery is returned when the times of starting over child prefork processes exceed
 	// the threshold.
+	ErrOverRecovery           = errors.New("exceeding the value of RecoverThreshold")
 	ErrOnlyReuseportOnWindows = errors.New("windows only supports Reuseport = true")
 )
 
@@ -31,6 +33,12 @@ type Logger interface {
 	Printf(format string, args ...interface{})
 }
 
+// Prefork implements fasthttp server prefork
+//
+// Preforks master process (with all cores) between several child processes
+// increases performance significantly, because Go doesn't have to share
+// and manage memory between cores
+//
 // WARNING: using prefork prevents the use of any global state!
 // Things like in-memory caches won't work.
 type Prefork struct {
@@ -60,8 +68,7 @@ type Prefork struct {
 	files []*os.File
 }
 
-func init() {
-	//nolint:gochecknoinits
+func init() { //nolint:gochecknoinits
 	// Definition flag to not break the program when the user adds their own flags
 	// and runs `flag.Parse()`
 	flag.Bool(preforkChildFlag[1:], false, "Is a child process")
@@ -74,9 +81,11 @@ func IsChild() bool {
 			return true
 		}
 	}
+
 	return false
 }
 
+// New wraps the fasthttp server to run with preforked processes
 func New(s *fasthttp.Server) *Prefork {
 	return &Prefork{
 		Network:           defaultNetwork,
@@ -85,7 +94,7 @@ func New(s *fasthttp.Server) *Prefork {
 		ServeFunc:         s.Serve,
 		ServeTLSFunc:      s.ServeTLS,
 		ServeTLSEmbedFunc: s.ServeTLSEmbed,
-		Reuseport:         true,
+		Reuseport: true,
 	}
 }
 
@@ -139,7 +148,13 @@ func (p *Prefork) setTCPListenerFiles(addr string) error {
 
 func (p *Prefork) doCommand() (*exec.Cmd, error) {
 	/* #nosec G204 */
-	cmd := exec.Command(os.Args[0], append(os.Args[1:], preforkChildFlag)...)
+	cmd := exec.Command(
+		os.Args[0],
+		append(
+			os.Args[1:],
+			preforkChildFlag,
+			)...
+		)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.ExtraFiles = p.files
@@ -165,9 +180,59 @@ func (p *Prefork) prefork(addr string) (err error) {
 		}()
 	}
 
-	if _, err = p.doCommand(); err != nil {
-		p.logger().Printf("failed to start a child prefork process, error: %v\n", err)
-		return
+	type procSig struct {
+		pid int
+		err error
+	}
+
+	goMaxProcs := runtime.GOMAXPROCS(0)
+	sigCh := make(chan procSig, goMaxProcs)
+	childProcs := make(map[int]*exec.Cmd)
+
+	defer func() {
+		for _, proc := range childProcs {
+			_ = proc.Process.Kill()
+		}
+	}()
+
+	for i := 0; i < goMaxProcs; i++ {
+		var cmd *exec.Cmd
+		if cmd, err = p.doCommand(); err != nil {
+			p.logger().Printf("failed to start a child prefork process, error: %v\n", err)
+			return
+		}
+
+		childProcs[cmd.Process.Pid] = cmd
+		go func() {
+			sigCh <- procSig{cmd.Process.Pid, cmd.Wait()}
+		}()
+
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	var exitedProcs int
+	for sig := range sigCh {
+		delete(childProcs, sig.pid)
+
+		p.logger().Printf("one of the child prefork processes exited with "+
+			"error: %v", sig.err)
+
+		if exitedProcs++; exitedProcs > p.RecoverThreshold {
+			p.logger().Printf("child prefork processes exit too many times, "+
+				"which exceeds the value of RecoverThreshold(%d), "+
+				"exiting the master process.\n", exitedProcs)
+			err = ErrOverRecovery
+			break
+		}
+
+		var cmd *exec.Cmd
+		if cmd, err = p.doCommand(); err != nil {
+			break
+		}
+		childProcs[cmd.Process.Pid] = cmd
+		go func() {
+			sigCh <- procSig{cmd.Process.Pid, cmd.Wait()}
+		}()
 	}
 
 	return
@@ -175,36 +240,53 @@ func (p *Prefork) prefork(addr string) (err error) {
 
 // ListenAndServe serves HTTP requests from the given TCP addr
 func (p *Prefork) ListenAndServe(addr string) error {
-	ln, err := p.listen(addr)
-	if err != nil {
-		return err
-	}
-	p.ln = ln
+	if IsChild() {
+		ln, err := p.listen(addr)
+		if err != nil {
+			return err
+		}
 
-	return p.ServeFunc(ln)
+		p.ln = ln
+
+		return p.ServeFunc(ln)
+	}
+
+	return p.prefork(addr)
 }
 
 // ListenAndServeTLS serves HTTPS requests from the given TCP addr
 //
 // certFile and keyFile are paths to TLS certificate and key files.
 func (p *Prefork) ListenAndServeTLS(addr, certKey, certFile string) error {
-	ln, err := p.listen(addr)
-	if err != nil {
-		return err
+	if IsChild() {
+		ln, err := p.listen(addr)
+		if err != nil {
+			return err
+		}
+
+		p.ln = ln
+
+		return p.ServeTLSFunc(ln, certFile, certKey)
 	}
-	p.ln = ln
-	return p.ServeTLSFunc(ln, certFile, certKey)
+
+	return p.prefork(addr)
 }
 
 // ListenAndServeTLSEmbed serves HTTPS requests from the given TCP addr
 //
 // certData and keyData must contain valid TLS certificate and key data.
 func (p *Prefork) ListenAndServeTLSEmbed(addr string, certData, keyData []byte) error {
-	ln, err := p.listen(addr)
-	if err != nil {
-		return err
-	}
-	p.ln = ln
+	if IsChild() {
+		ln, err := p.listen(addr)
+		if err != nil {
+			return err
+		}
 
-	return p.ServeTLSEmbedFunc(ln, certData, keyData)
+		p.ln = ln
+
+		return p.ServeTLSEmbedFunc(ln, certData, keyData)
+	}
+
+	return p.prefork(addr)
 }
+

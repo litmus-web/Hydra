@@ -31,7 +31,8 @@ func startWorkerServer(workerPort int) {
 		}
 	}
 
-	if err := fasthttp.ListenAndServe(fmt.Sprintf("127.0.0.1:%v", workerPort), requestHandler); err != nil {
+	binding := fmt.Sprintf("127.0.0.1:%v", workerPort)
+	if err := fasthttp.ListenAndServe(binding, requestHandler); err != nil {
 		panic(err)
 	}
 }
@@ -40,9 +41,13 @@ func startMainServer(mainHost string) {
 	server := &fasthttp.Server{
 		Handler: anyHTTPHandler,
 	}
+
 	preforkServer := prefork.New(server)
 
-	fmt.Printf("Server started server on http://%s\n", mainHost)
+	if !prefork.IsChild() {
+		fmt.Printf("Server started server on http://%s\n", mainHost)
+	}
+
 	if err := preforkServer.ListenAndServe(mainHost); err != nil {
 		panic(err)
 	}
@@ -61,6 +66,12 @@ var cache = make(map[uint64]chan ASGIResponse)
 var cacheLock = sync.RWMutex{}
 
 var count uint64 = 0
+var countPool = sync.Pool{
+	New: func() interface{} {
+		atomic.AddUint64(&count, 1)
+		return count
+	},
+}
 
 ///
 ///  General Structs for communication between systems.
@@ -89,10 +100,9 @@ type ASGIResponse struct {
 ///  Main area where all incoming requests get sent.
 ///
 func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
-	atomic.AddUint64(&count, 1)
-
+	reqId := countPool.Get().(uint64)
 	toGo := OutGoingRequest{
-		RequestId: count,
+		RequestId: reqId,
 		Method:    string(ctx.Method()),
 		Remote:    ctx.RemoteAddr().String(),
 		Path:      string(ctx.Path()),
@@ -106,20 +116,27 @@ func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
 	incomingChan := make(chan ASGIResponse)
 
 	cacheLock.Lock()
-	cache[count] = incomingChan
+	cache[reqId] = incomingChan
 	cacheLock.Unlock()
 
-	for {
-		workerResponse := <-incomingChan
-		if workerResponse.Type == "response.start" {
-			writeStart(ctx, workerResponse)
-		} else if workerResponse.Type == "response.body" {
-			writeBody(ctx, workerResponse)
-			if !workerResponse.MoreBody {
-				break
+	for { // todo Make this able to support atomic values, timeouts and not let python cause a security issue
+
+		select {
+		case workerResponse := <-incomingChan:
+			if workerResponse.Type == "response.start" {
+				writeStart(ctx, workerResponse)
+			} else if workerResponse.Type == "response.body" {
+				writeBody(ctx, workerResponse)
+				if !workerResponse.MoreBody {
+					countPool.Put(reqId)
+					break
+				}
 			}
+			time.Sleep(5 * time.Microsecond)
+
+		case <-time.After(12 * time.Second):
+			fmt.Println("timeout 1")
 		}
-		time.Sleep(5 * time.Microsecond)
 	}
 }
 
