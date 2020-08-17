@@ -5,13 +5,12 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Coroutine, Any
 
 import typing
-from aiohttp import ClientWebSocketResponse
 
 from .response import OutGoingResponse
 
 
 class ServerInfo:
-    def __init__(self, port: int=None):
+    def __init__(self, port: int = None):
         self.port = port
 
 
