@@ -1,3 +1,6 @@
 /venv/
 *.exe
+/test/
+/import_test.py
+
 *.pyc

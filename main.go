@@ -14,7 +14,7 @@ import (
 // Flags
 var (
 	host = flag.String(
-		"host", "127.0.0.1:8000", "The address for the server to bind to.")
+		"host", "127.0.0.1:8800", "The address for the server to bind to.")
 	app = flag.String(
 		"app", "", "The WSGI, ASGI or raw app name and path, e.g 'my_server:app'")
 	adapter = flag.String(

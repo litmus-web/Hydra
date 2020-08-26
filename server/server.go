@@ -2,13 +2,11 @@ package server
 
 import (
 	"fmt"
+	"github.com/fasthttp/websocket"
+	"github.com/valyala/fasthttp"
 	"log"
 	"sync"
 	"sync/atomic"
-	"time"
-
-	"github.com/fasthttp/websocket"
-	"github.com/valyala/fasthttp"
 
 	"../prefork"
 )
@@ -88,19 +86,26 @@ type OutGoingRequest struct {
 }
 
 type ASGIResponse struct {
-	RequestId uint64     `json:"request_id"`
-	Type      string     `json:"type"`
-	Status    int        `json:"status"`
-	Headers   [][]string `json:"headers"`
-	Body      string     `json:"body"`
-	MoreBody  bool       `json:"more_body"`
+	Meta      IncomingMetadata `json:"meta_data"`
+	RequestId uint64           `json:"request_id"`
+	Type      string           `json:"type"`
+	Status    int              `json:"status"`
+	Headers   [][]string       `json:"headers"`
+	Body      string           `json:"body"`
+	MoreBody  bool             `json:"more_body"`
+}
+
+type IncomingMetadata struct {
+	ResponseType string `json:"meta_response_type"`
 }
 
 ///
 ///  Main area where all incoming requests get sent.
 ///
 func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
+
 	reqId := countPool.Get().(uint64)
+
 	toGo := OutGoingRequest{
 		RequestId: reqId,
 		Method:    string(ctx.Method()),
@@ -119,38 +124,24 @@ func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
 	cache[reqId] = incomingChan
 	cacheLock.Unlock()
 
-	for { // todo Make this able to support atomic values, timeouts and not let python cause a security issue
+	workerResponse := <-incomingChan
 
-		select {
-		case workerResponse := <-incomingChan:
-			if workerResponse.Type == "response.start" {
-				writeStart(ctx, workerResponse)
-			} else if workerResponse.Type == "response.body" {
-				writeBody(ctx, workerResponse)
-				if !workerResponse.MoreBody {
-					countPool.Put(reqId)
-					break
-				}
-			}
-			time.Sleep(5 * time.Microsecond)
+	switch workerResponse.Meta.ResponseType {
 
-		case <-time.After(12 * time.Second):
-			fmt.Println("timeout 1")
-		}
-	}
-}
+	case "timeout":
+		writeTimeout(ctx)
+		countPool.Put(reqId)
+		return
 
-func writeStart(ctx *fasthttp.RequestCtx, resp ASGIResponse) {
-	ctx.SetStatusCode(resp.Status)
-	for _, val := range resp.Headers {
-		ctx.Response.Header.Set(val[0], val[1])
-	}
-}
+	case "partial":
+		invokePartial(ctx, workerResponse, incomingChan, reqId)
 
-func writeBody(ctx *fasthttp.RequestCtx, resp ASGIResponse) {
-	_, err := fmt.Fprintln(ctx, resp.Body)
-	if err != nil {
-		log.Fatal(err)
+	case "complete":
+		invokeAll(ctx, workerResponse)
+
+	default:
+		log.Printf("Invalid response type recieved from worker with Id: %v\n", reqId)
+		return
 	}
 }
 

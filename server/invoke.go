@@ -1,0 +1,109 @@
+package server
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/valyala/fasthttp"
+)
+
+func writeTimeout(ctx *fasthttp.RequestCtx) {
+	/*
+		writeTimeout represents a worker just timing out or something just
+		breaking everything. Basically a "EVERYONE PANIC!" response that should
+		NEVER be triggered, by default the timeout is 15 seconds before Sandman
+		will automatically stop the worker request returning a 503 status code to
+		the incoming external request, the request id is *not* returned to the pool
+		to stop the workers possibly returning someone else's response in another request.
+
+		For all intensive purposes the request is dead and dangerous.
+	*/
+
+	ctx.SetStatusCode(503)
+	ctx.SetBody([]byte("Sandman Automated Timeout: Worker took to long to respond."))
+}
+
+func invokePartial(
+	ctx *fasthttp.RequestCtx,
+	workerResponse ASGIResponse,
+	incomingChan chan ASGIResponse,
+	reqId uint64,
+) {
+	/*
+		invokePartial anticipates the response from	the websocket coming in
+		parts, it expects a `response.start` incoming type first followed by
+		`response.body` types as it writes these to the	socket individually.
+
+		This is used by anything where the body of the request will exceed the
+		maximum message length on the WS where overhead would be higher than
+		doing it in parts.
+		The function will finish when the response gives a 	more_body = False
+		response, returning the request id to the pool.
+
+		Invokes:
+			- writeStart() x 1
+			- writeBody() x n
+
+	*/
+
+	if workerResponse.Type == "response.start" {
+		writeStart(ctx, workerResponse)
+	} else {
+		log.Fatalln("Fix me")
+	}
+
+	for workerResponse := range incomingChan {
+		if workerResponse.Type == "response.body" {
+			writeBody(ctx, workerResponse)
+			if !workerResponse.MoreBody {
+				countPool.Put(reqId)
+				return
+			}
+		} else {
+			return
+		}
+	}
+}
+
+func invokeAll(
+	ctx *fasthttp.RequestCtx,
+	workerResponse ASGIResponse,
+) {
+	/*
+		invokeAll represents a single ws response that contains
+		both the status code, headers and body all in one, used
+		for short and simple responses where doing it in parts
+		adds more overhead than sending the body itself.
+		Obviously this cannot be done for larger bodies because
+		it exceeds the websocket max body limit
+		(Changeable but not recommended.)
+
+		Invokes:
+			- writeStart() x 1
+			- writeBody() x 1
+
+	*/
+
+	writeStart(ctx, workerResponse)
+	writeBody(ctx, workerResponse)
+}
+
+func writeStart(ctx *fasthttp.RequestCtx, resp ASGIResponse) {
+	// writeStart sets the status code and headers to the request
+	// from the response, this is the equivalent of http.response.start
+	// in a ASGI system.
+	ctx.SetStatusCode(resp.Status)
+	for _, val := range resp.Headers {
+		ctx.Response.Header.Set(val[0], val[1])
+	}
+}
+
+func writeBody(ctx *fasthttp.RequestCtx, resp ASGIResponse) {
+	// writeBody does what it says on the tin, writes the body.
+	// todo add a better handler in case the external connection is closed.
+
+	_, err := fmt.Fprintln(ctx, resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+}

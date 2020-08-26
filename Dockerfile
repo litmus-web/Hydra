@@ -1,4 +1,4 @@
-FROM golang:latest as builder
+FROM golang as builder
 
 RUN mkdir /sandman
 WORKDIR /sandman

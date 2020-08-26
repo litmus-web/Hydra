@@ -192,6 +192,7 @@ class AutoShardedWorker:
 
         self._shards = {}
         self._shard_restarts = 0
+        self._loop = asyncio.get_event_loop()
 
     async def run(self) -> None:
         """Creates n amount of shards and manages them as they connect,
@@ -210,7 +211,7 @@ class AutoShardedWorker:
             request_callback=self.req_callback,
             msg_callback=self.msg_callback,
         )
-        task = asyncio.create_task(shard.connect())
+        task = self._loop.create_task(shard.connect())
         self._shards[shard_id] = task
         return task
 
