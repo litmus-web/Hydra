@@ -1,2 +1,2 @@
-# The Fast. Efficent. Adaptable HTTP server for Python
+# The universal production server for python
 
