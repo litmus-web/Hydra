@@ -1,2 +1,2 @@
-# Sandman - The Fast, Efficent and Adaptable HTTP server for Python
+# The Fast, Efficent and Adaptable HTTP server for Python
 
