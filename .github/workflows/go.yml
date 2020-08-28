@@ -31,7 +31,7 @@ jobs:
         fi
 
     - name: Build
-      run: go build -v ./sandman_server
+      run: go build ./sandman_server/main.go
 
     - name: Test
-      run: go test -v ./sandman_server
+      run: go test ./sandman_server/main.go
