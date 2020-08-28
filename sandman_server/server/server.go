@@ -17,27 +17,28 @@ var incomingChan = make(chan ASGIResponse)
 //
 //  Starting Areas, spawns all the servers
 //
-func StartServers(mainHost string, workerPort int) {
-	/*
-		StartServers is invokes both the main server and the worker server.
 
-		Invokes:
-			- go startWorkerServer()
-			- startMainServer()
-	*/
+/*
+	StartServers is invokes both the main server and the worker server.
+
+	Invokes:
+		- go startWorkerServer()
+		- startMainServer()
+*/
+func StartServers(mainHost string, workerPort int) {
 	go startWorkerServer(workerPort)
 	startMainServer(mainHost)
 }
 
-func startWorkerServer(workerPort int) {
-	/*
-		startWorkerServer is internal server that is reserved just for worker
-		processes, and the only entry point is via `ws://127.0.0.1:workerPort/workers`
-		anything else is ignored and returns a 403 or method not allowed.
+/*
+	startWorkerServer is internal server that is reserved just for worker
+	processes, and the only entry point is via `ws://127.0.0.1:workerPort/workers`
+	anything else is ignored and returns a 403 or method not allowed.
 
-		Invokes:
-			- workerHandler()
-	*/
+	Invokes:
+		- workerHandler()
+*/
+func startWorkerServer(workerPort int) {
 	requestHandler := func(ctx *fasthttp.RequestCtx) {
 		switch string(ctx.Path()) {
 		case "/workers":
@@ -53,11 +54,11 @@ func startWorkerServer(workerPort int) {
 	}
 }
 
+/*
+	startMainServer (public) starts the pre-forking FastHTTP server binding to the
+	set address of `mainHost`
+*/
 func startMainServer(mainHost string) {
-	/*
-		startMainServer (public) starts the pre-forking FastHTTP server binding to the
-		set address of `mainHost`
-	*/
 	server := &fasthttp.Server{
 		Handler: anyHTTPHandler,
 	}
