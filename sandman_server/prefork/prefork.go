@@ -94,7 +94,7 @@ func New(s *fasthttp.Server) *Prefork {
 		ServeFunc:         s.Serve,
 		ServeTLSFunc:      s.ServeTLS,
 		ServeTLSEmbedFunc: s.ServeTLSEmbed,
-		Reuseport: true,
+		Reuseport:         true,
 	}
 }
 
@@ -153,8 +153,8 @@ func (p *Prefork) doCommand() (*exec.Cmd, error) {
 		append(
 			os.Args[1:],
 			preforkChildFlag,
-			)...
-		)
+		)...,
+	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.ExtraFiles = p.files
@@ -289,4 +289,3 @@ func (p *Prefork) ListenAndServeTLSEmbed(addr string, certData, keyData []byte) 
 
 	return p.prefork(addr)
 }
-

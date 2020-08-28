@@ -59,4 +59,3 @@ func logPython(stdout io.ReadCloser) {
 		log.Println(msg)
 	}
 }
-
