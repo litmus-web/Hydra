@@ -2,24 +2,42 @@ package server
 
 import (
 	"fmt"
-	"github.com/fasthttp/websocket"
-	"github.com/valyala/fasthttp"
 	"log"
 	"sync"
 	"sync/atomic"
 
+	"github.com/fasthttp/websocket"
+	"github.com/valyala/fasthttp"
+
 	"../prefork"
 )
 
-///
-///  Starting Areas, spawns all the servers
-///
+var incomingChan = make(chan ASGIResponse)
+
+//
+//  Starting Areas, spawns all the servers
+//
 func StartServers(mainHost string, workerPort int) {
+	/*
+		StartServers is invokes both the main server and the worker server.
+
+		Invokes:
+			- go startWorkerServer()
+			- startMainServer()
+	*/
 	go startWorkerServer(workerPort)
 	startMainServer(mainHost)
 }
 
 func startWorkerServer(workerPort int) {
+	/*
+		startWorkerServer is internal server that is reserved just for worker
+		processes, and the only entry point is via `ws://127.0.0.1:workerPort/workers`
+		anything else is ignored and returns a 403 or method not allowed.
+
+		Invokes:
+			- workerHandler()
+	*/
 	requestHandler := func(ctx *fasthttp.RequestCtx) {
 		switch string(ctx.Path()) {
 		case "/workers":
@@ -36,6 +54,10 @@ func startWorkerServer(workerPort int) {
 }
 
 func startMainServer(mainHost string) {
+	/*
+		startMainServer (public) starts the pre-forking FastHTTP server binding to the
+		set address of `mainHost`
+	*/
 	server := &fasthttp.Server{
 		Handler: anyHTTPHandler,
 	}
@@ -51,17 +73,13 @@ func startMainServer(mainHost string) {
 	}
 }
 
-///
-///  General variables and constants for communication between systems.
-///
+//
+//  General variables and constants for communication between systems.
+//
 var upgrader = websocket.FastHTTPUpgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 }
-
-var toPythonChan = make(chan OutGoingRequest)
-var cache = make(map[uint64]chan ASGIResponse)
-var cacheLock = sync.RWMutex{}
 
 var count uint64 = 0
 var countPool = sync.Pool{
@@ -71,9 +89,9 @@ var countPool = sync.Pool{
 	},
 }
 
-///
-///  General Structs for communication between systems.
-///
+//
+//  General Structs for communication between systems.
+//
 type OutGoingRequest struct {
 	RequestId uint64            `json:"request_id"`
 	Method    string            `json:"method"`
@@ -102,6 +120,33 @@ type IncomingMetadata struct {
 ///
 ///  Main area where all incoming requests get sent.
 ///
+
+/*
+	anyHTTPHandler is the main handler that handles all incoming
+	http requests on the main entry point, from `/` to `/abc/123`
+
+	A request id is taken from the pool to make use of recycling objects
+	if there is no free ids one is atomically gotten which is then later
+	returned.
+
+	It then creates a `OutGoingRequest` interface containing anything needed
+	for the ASGI, WSGI or Raw systems. todo add headers instead of a empty map
+	Because FastHTTP does not support http/2 yet we can hardcode the request
+	version.
+
+	A channel is made and added to the cache waiting for the responses of the
+	workers, the server then waits for the responses coming from the channel.
+
+	Upon a incoming response it matches the metadata type (timeout, partial, complete)
+	to check if the worker has timed out internally, has a one shot response or a multi-part
+	response.
+
+	Invokes:
+		- writeTimeout()	`timeout`
+		- invokePartial()	`partial`
+		- invokeAll()		`complete`
+
+*/
 func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
 
 	reqId := countPool.Get().(uint64)
@@ -116,14 +161,10 @@ func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
 		Body:      "",
 		Query:     ctx.QueryArgs().String(),
 	}
-	toPythonChan <- toGo
+	c := acquireShard("1")
+	c <- toGo
 
-	incomingChan := make(chan ASGIResponse)
-
-	cacheLock.Lock()
-	cache[reqId] = incomingChan
-	cacheLock.Unlock()
-
+	// todo Remove this and merge into a dynamic handler
 	workerResponse := <-incomingChan
 
 	switch workerResponse.Meta.ResponseType {
@@ -142,6 +183,7 @@ func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
 	default:
 		log.Printf("Invalid response type recieved from worker with Id: %v\n", reqId)
 		return
+
 	}
 }
 
@@ -153,27 +195,50 @@ func workerHandler(ctx *fasthttp.RequestCtx) {
 	_ = upgrader.Upgrade(ctx, upgradedWebsocket)
 }
 
+/*
+	upgradedWebsocket is the callback after a websocket connection
+	has been successfully upgraded and starts the read goroutine and
+	then handles any writing.
+
+	Invokes:
+		- go handleRead(conn)
+		- handleWrite(conn)
+*/
 func upgradedWebsocket(conn *websocket.Conn) {
 	go handleRead(conn)
 	handleWrite(conn)
 }
 
+/*
+	handleRead is a infinite loop waiting for incoming
+	websocket messages to marshal to a ASGIResponse
+	which is the sent via a channel through a RwLock.
+*/
 func handleRead(conn *websocket.Conn) {
+
 	for {
 		incoming := ASGIResponse{}
 		err := conn.ReadJSON(&incoming)
 		if err != nil {
 			log.Fatal(err)
 		}
-		cacheLock.RLock()
-		cache[incoming.RequestId] <- incoming
-		cacheLock.RUnlock()
+
+		// todo Remove this and merge into a dynamic handler
+		incomingChan <- incoming
 	}
 }
 
+/*
+	handleWrite is just a infinite loop sending anything coming
+	through the channel to the websocket worker.
+*/
 func handleWrite(conn *websocket.Conn) {
-	for {
-		toGo := <-toPythonChan
+
+	shardChannel := make(chan OutGoingRequest)
+	setShard("1", shardChannel)
+
+	var toGo OutGoingRequest
+	for toGo = range shardChannel {
 		_ = conn.WriteJSON(toGo)
 	}
 }
