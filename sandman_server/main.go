@@ -67,7 +67,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	go workers.StartChildren(prefork.IsChild(), *app, *adapter, workerPort, 1)
+	go workers.StartChildren(prefork.IsChild(), *app, *adapter, workerPort, 2)
 	server.StartServers(*host, workerPort)
 }
 

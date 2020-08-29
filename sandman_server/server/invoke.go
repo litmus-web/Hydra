@@ -46,7 +46,7 @@ func invokePartial(
 	if workerResponse.Type == "response.start" {
 		writeStart(ctx, workerResponse)
 	} else {
-		log.Fatalln("Fix me")
+		log.Fatalln("Fix me") // todo replace
 	}
 
 	for workerResponse := range incomingChan {

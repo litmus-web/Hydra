@@ -2,17 +2,14 @@ package server
 
 import (
 	"fmt"
+	"github.com/fasthttp/websocket"
+	"github.com/valyala/fasthttp"
 	"log"
 	"sync"
 	"sync/atomic"
 
-	"github.com/fasthttp/websocket"
-	"github.com/valyala/fasthttp"
-
 	"../prefork"
 )
-
-var incomingChan = make(chan ASGIResponse)
 
 //
 //  Starting Areas, spawns all the servers
@@ -94,6 +91,7 @@ var countPool = sync.Pool{
 //  General Structs for communication between systems.
 //
 type OutGoingRequest struct {
+	OpCode    int               `json:"op"`
 	RequestId uint64            `json:"request_id"`
 	Method    string            `json:"method"`
 	Remote    string            `json:"remote"`
@@ -116,6 +114,10 @@ type ASGIResponse struct {
 
 type IncomingMetadata struct {
 	ResponseType string `json:"meta_response_type"`
+}
+
+type ShardIdentify struct {
+	ShardId string `json:"shard_id"`
 }
 
 ///
@@ -153,6 +155,7 @@ func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
 	reqId := countPool.Get().(uint64)
 
 	toGo := OutGoingRequest{
+		OpCode:    1,
 		RequestId: reqId,
 		Method:    string(ctx.Method()),
 		Remote:    ctx.RemoteAddr().String(),
@@ -162,11 +165,15 @@ func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
 		Body:      "",
 		Query:     ctx.QueryArgs().String(),
 	}
-	c := acquireShard("1")
-	c <- toGo
+	pair := acquireShard("1")
+	pair.In <- toGo
 
-	// todo Remove this and merge into a dynamic handler
-	workerResponse := <-incomingChan
+	var workerResponse ASGIResponse
+	for workerResponse = range pair.Out {
+		if workerResponse.RequestId == reqId {
+			break
+		}
+	}
 
 	switch workerResponse.Meta.ResponseType {
 
@@ -176,7 +183,7 @@ func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
 		return
 
 	case "partial":
-		invokePartial(ctx, workerResponse, incomingChan, reqId)
+		invokePartial(ctx, workerResponse, pair.Out, reqId)
 
 	case "complete":
 		invokeAll(ctx, workerResponse)
@@ -206,8 +213,9 @@ func workerHandler(ctx *fasthttp.RequestCtx) {
 		- handleWrite(conn)
 */
 func upgradedWebsocket(conn *websocket.Conn) {
-	go handleRead(conn)
-	handleWrite(conn)
+	callback := make(chan ShardIdentify)
+	go handleRead(conn, callback)
+	handleWrite(conn, callback)
 }
 
 /*
@@ -215,8 +223,23 @@ func upgradedWebsocket(conn *websocket.Conn) {
 	websocket messages to marshal to a ASGIResponse
 	which is the sent via a channel through a RwLock.
 */
-func handleRead(conn *websocket.Conn) {
+func handleRead(conn *websocket.Conn, c chan ShardIdentify) {
+	// Send ident payload only send
+	v := map[string]int{
+		"op": 0,
+	}
+	_ = conn.WriteJSON(v)
 
+	// Read returned identify
+	s := ShardIdentify{}
+	err := conn.ReadJSON(&s)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(s)
+	c <- s
+
+	pair := acquireShard(s.ShardId)
 	for {
 		incoming := ASGIResponse{}
 		err := conn.ReadJSON(&incoming)
@@ -224,8 +247,7 @@ func handleRead(conn *websocket.Conn) {
 			log.Fatal(err)
 		}
 
-		// todo Remove this and merge into a dynamic handler
-		incomingChan <- incoming
+		pair.Out <- incoming
 	}
 }
 
@@ -233,13 +255,17 @@ func handleRead(conn *websocket.Conn) {
 	handleWrite is just a infinite loop sending anything coming
 	through the channel to the websocket worker.
 */
-func handleWrite(conn *websocket.Conn) {
+func handleWrite(conn *websocket.Conn, c chan ShardIdentify) {
+	shard := <-c
 
-	shardChannel := make(chan OutGoingRequest)
-	setShard("1", shardChannel)
+	pair := ChannelPair{
+		In:  make(chan OutGoingRequest),
+		Out: make(chan ASGIResponse),
+	}
+	setShard(shard.ShardId, pair)
 
 	var toGo OutGoingRequest
-	for toGo = range shardChannel {
+	for toGo = range pair.In {
 		_ = conn.WriteJSON(toGo)
 	}
 }

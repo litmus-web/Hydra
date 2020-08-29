@@ -39,6 +39,13 @@ class InternalResponses:
     CLOSED_ABNORMALLY = ClosedAbnormally()
 
 
+@dataclass(frozen=True)
+class OpCodes:
+    IDENTIFY = 0
+    HTTP_REQUEST = 1
+    MESSAGE = 2
+
+
 class WebsocketShard:
     """This class represents a single websocket shard that connects to Sandman
     that then handles incoming HTTP requests.
@@ -77,6 +84,7 @@ class WebsocketShard:
         try:
             async with self.session.ws_connect(self.binding_addr) as ws:
                 await self.on_connect(ws)
+
                 while not ws.closed:
                     msg: WSMessage = await ws.receive()
                     if msg.type == WSMsgType.TEXT:
@@ -142,16 +150,26 @@ class WebsocketShard:
             return self.msg_callback(ws, msg.data)
 
         try:
-            await self.req_callback(ws, data)
+            if data["op"] == 0:
+                ident = {
+                    "shard_id": self.shard_id
+                }
+                await ws.send_json(ident)
+            elif data["op"] == 1:
+                await self.req_callback(ws, data)
+
         except Exception as err:
-            data = {
-                "request_id": data["request_id"],
-                "status": 503,
-                "headers": [],
-                "body": "A internal server error has occurred."
-            }
-            await ws.send_bytes(dumps_data(data))
-            raise err
+            if data.get('op', -1) == 1:
+                data = {
+                    "request_id": data["request_id"],
+                    "status": 503,
+                    "headers": [],
+                    "body": "A internal server error has occurred."
+                }
+                await ws.send_bytes(dumps_data(data))
+                raise err
+            else:
+                print(data)
 
 
 class AutoShardedWorker:
