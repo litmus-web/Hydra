@@ -51,20 +51,17 @@ func invokePartial(
 	default:
 		log.Fatalln("well fuck")
 	}
-	fmt.Println("wew")
 
 	for workerResponse := range incomingChan {
 		if workerResponse.RequestId == reqId {
 			switch workerResponse.Type {
 			case "response.start":
 				writeStart(ctx, workerResponse)
-				fmt.Println("wwew a ")
 			case "response.body":
 				writeBody(ctx, workerResponse)
 				if !workerResponse.MoreBody {
 					return
 				}
-
 			default:
 				log.Fatalln("well fuck")
 			}
