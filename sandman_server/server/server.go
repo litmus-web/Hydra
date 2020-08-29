@@ -215,17 +215,6 @@ func workerHandler(ctx *fasthttp.RequestCtx) {
 		- handleWrite(conn)
 */
 func upgradedWebsocket(conn *websocket.Conn) {
-	callback := make(chan ShardIdentify)
-	go handleRead(conn, callback)
-	handleWrite(conn, callback)
-}
-
-/*
-	handleRead is a infinite loop waiting for incoming
-	websocket messages to marshal to a ASGIResponse
-	which is the sent via a channel through a RwLock.
-*/
-func handleRead(conn *websocket.Conn, c chan ShardIdentify) {
 	// Send ident payload only send
 	v := map[string]int{
 		"op": 0,
@@ -238,16 +227,31 @@ func handleRead(conn *websocket.Conn, c chan ShardIdentify) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	c <- s
 
-	pair := acquireShard(s.ShardId)
+	pair := ChannelPair{
+		In:  make(chan OutGoingRequest),
+		Out: make(chan ASGIResponse),
+	}
+
+	setShard(s.ShardId, pair)
+
+	go handleRead(conn, s, pair)
+	handleWrite(conn, s, pair)
+}
+
+/*
+	handleRead is a infinite loop waiting for incoming
+	websocket messages to marshal to a ASGIResponse
+	which is the sent via a channel through a RwLock.
+*/
+func handleRead(conn *websocket.Conn, shard ShardIdentify, pair ChannelPair) {
+	fmt.Println("Reading shard ", shard.ShardId)
 	for {
 		incoming := ASGIResponse{}
 		err := conn.ReadJSON(&incoming)
 		if err != nil {
 			log.Fatal(err)
 		}
-
 		pair.Out <- incoming
 	}
 }
@@ -256,17 +260,11 @@ func handleRead(conn *websocket.Conn, c chan ShardIdentify) {
 	handleWrite is just a infinite loop sending anything coming
 	through the channel to the websocket worker.
 */
-func handleWrite(conn *websocket.Conn, c chan ShardIdentify) {
-	shard := <-c
-
-	pair := ChannelPair{
-		In:  make(chan OutGoingRequest),
-		Out: make(chan ASGIResponse),
-	}
-	setShard(shard.ShardId, pair)
-
+func handleWrite(conn *websocket.Conn, shard ShardIdentify, pair ChannelPair) {
+	fmt.Println("writing to shard ", shard.ShardId)
 	var toGo OutGoingRequest
 	for toGo = range pair.In {
+		fmt.Println("got ", toGo)
 		_ = conn.WriteJSON(toGo)
 	}
 }
