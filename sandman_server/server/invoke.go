@@ -43,21 +43,31 @@ func invokePartial(
 	incomingChan chan ASGIResponse,
 	reqId uint64,
 ) {
-	if workerResponse.Type == "response.start" {
+	switch workerResponse.Type {
+	case "response.start":
 		writeStart(ctx, workerResponse)
-	} else {
-		log.Fatalln("Fix me") // todo replace
+	case "response.body":
+		writeBody(ctx, workerResponse)
+	default:
+		log.Fatalln("well fuck")
 	}
+	fmt.Println("wew")
 
 	for workerResponse := range incomingChan {
-		if workerResponse.Type == "response.body" {
-			writeBody(ctx, workerResponse)
-			if !workerResponse.MoreBody {
-				countPool.Put(reqId)
-				return
+		if workerResponse.RequestId == reqId {
+			switch workerResponse.Type {
+			case "response.start":
+				writeStart(ctx, workerResponse)
+				fmt.Println("wwew a ")
+			case "response.body":
+				writeBody(ctx, workerResponse)
+				if !workerResponse.MoreBody {
+					return
+				}
+
+			default:
+				log.Fatalln("well fuck")
 			}
-		} else {
-			return
 		}
 	}
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 	"os/exec"
 	"time"
 )
@@ -33,7 +32,11 @@ func startPythonWorker(isChild bool, app string, adapter string, port int, shard
 		"--port", fmt.Sprintf("%v", port),
 		"--shards", fmt.Sprintf("%v", shards),
 	)
-	child.Stderr = os.Stderr
+	stderr, err := child.StderrPipe()
+	if err != nil {
+		log.Fatalln("Fatal pipe error connecting to python worker.")
+	}
+
 	stdout, err := child.StdoutPipe()
 	if err != nil {
 		log.Fatalln("Fatal pipe error connecting to python worker.")
@@ -46,7 +49,19 @@ func startPythonWorker(isChild bool, app string, adapter string, port int, shard
 
 	time.Sleep(1 * time.Second)
 	go logPython(stdout)
+	go logPythonInfo(stderr)
 	return *child
+}
+
+func logPythonInfo(stderr io.ReadCloser) {
+	reader := bufio.NewReader(stderr)
+	for {
+		msg, err := reader.ReadString('\n')
+		if err != nil {
+			log.Fatalln("Failed to read stdout of python worker.")
+		}
+		log.Print(msg)
+	}
 }
 
 func logPython(stdout io.ReadCloser) {

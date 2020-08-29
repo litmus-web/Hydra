@@ -63,7 +63,7 @@ func startMainServer(mainHost string) {
 	preforkServer := prefork.New(server)
 
 	if !prefork.IsChild() {
-		fmt.Printf("Server started server on http://%s\n", mainHost)
+		log.Printf("[ Sandman Server Info ] Server started server on http://%s\n", mainHost)
 	}
 
 	if err := preforkServer.ListenAndServe(mainHost); err != nil {
@@ -167,34 +167,39 @@ func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
 		Body:      "",
 		Query:     ctx.QueryArgs().String(),
 	}
-	pair := acquireShard("1")
+
+	shardId := fmt.Sprintf("%v", reqId%2)
+	pair := acquireShard(fmt.Sprintf("%v", shardId))
 	pair.In <- toGo
 
 	var workerResponse ASGIResponse
 	for workerResponse = range pair.Out {
 		if workerResponse.RequestId == reqId {
-			break
+			switch workerResponse.Meta.ResponseType {
+
+			case "timeout":
+				writeTimeout(ctx)
+				countPool.Put(reqId)
+				return
+
+			case "partial":
+				invokePartial(ctx, workerResponse, pair.Out, reqId)
+				countPool.Put(reqId)
+				return
+
+			case "complete":
+				invokeAll(ctx, workerResponse)
+				countPool.Put(reqId)
+				return
+
+			default:
+				log.Printf("Invalid response type recieved from worker with Id: %v\n", reqId)
+				return
+
+			}
 		}
 	}
 
-	switch workerResponse.Meta.ResponseType {
-
-	case "timeout":
-		writeTimeout(ctx)
-		countPool.Put(reqId)
-		return
-
-	case "partial":
-		invokePartial(ctx, workerResponse, pair.Out, reqId)
-
-	case "complete":
-		invokeAll(ctx, workerResponse)
-
-	default:
-		log.Printf("Invalid response type recieved from worker with Id: %v\n", reqId)
-		return
-
-	}
 }
 
 ///
@@ -235,8 +240,8 @@ func upgradedWebsocket(conn *websocket.Conn) {
 
 	setShard(s.ShardId, pair)
 
-	go handleRead(conn, s, pair)
-	handleWrite(conn, s, pair)
+	go handleRead(conn, pair)
+	handleWrite(conn, pair)
 }
 
 /*
@@ -244,8 +249,7 @@ func upgradedWebsocket(conn *websocket.Conn) {
 	websocket messages to marshal to a ASGIResponse
 	which is the sent via a channel through a RwLock.
 */
-func handleRead(conn *websocket.Conn, shard ShardIdentify, pair ChannelPair) {
-	fmt.Println("Reading shard ", shard.ShardId)
+func handleRead(conn *websocket.Conn, pair ChannelPair) {
 	for {
 		incoming := ASGIResponse{}
 		err := conn.ReadJSON(&incoming)
@@ -260,11 +264,9 @@ func handleRead(conn *websocket.Conn, shard ShardIdentify, pair ChannelPair) {
 	handleWrite is just a infinite loop sending anything coming
 	through the channel to the websocket worker.
 */
-func handleWrite(conn *websocket.Conn, shard ShardIdentify, pair ChannelPair) {
-	fmt.Println("writing to shard ", shard.ShardId)
+func handleWrite(conn *websocket.Conn, pair ChannelPair) {
 	var toGo OutGoingRequest
 	for toGo = range pair.In {
-		fmt.Println("got ", toGo)
 		_ = conn.WriteJSON(toGo)
 	}
 }
