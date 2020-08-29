@@ -148,7 +148,7 @@ class WebsocketShard:
             if data["op"] == 0:
                 ident = {
                     "op": OpCodes.IDENTIFY,
-                    "shard_id": self.shard_id
+                    "shard_id": str(self.shard_id),
                 }
                 await ws.send_json(ident)
             elif data["op"] == 1:
@@ -161,7 +161,7 @@ class WebsocketShard:
                     "request_id": data["request_id"],
                     "status": 503,
                     "headers": [],
-                    "body": "A internal server error has occurred."
+                    "body": "A internal server error has occurred.",
                 }
                 await ws.send_bytes(dumps_data(data))
                 raise err
