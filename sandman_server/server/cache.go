@@ -1,17 +1,17 @@
 package server
 
 import (
-	"github.com/sasha-s/go-deadlock"
+	"sync"
 )
 
 var (
 	shardChannels map[string]ChannelPair
-	shardLock     deadlock.RWMutex
+	shardLock     sync.RWMutex
 )
 
 func init() {
 	shardChannels = make(map[string]ChannelPair)
-	shardLock = deadlock.RWMutex{}
+	shardLock = sync.RWMutex{}
 }
 
 func acquireShard(shardId string) ChannelPair {

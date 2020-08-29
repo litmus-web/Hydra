@@ -2,7 +2,7 @@ FROM golang as builder
 
 RUN mkdir /sandman
 WORKDIR /sandman
-COPY .. /sandman/
+COPY . /sandman/
 
 RUN go get "github.com/valyala/fasthttp"
 RUN go get "github.com/fasthttp/websocket"
@@ -14,5 +14,5 @@ FROM python:3
 COPY --from=builder /usr/local/bin/sandman /usr/local/bin/sandman
 RUN mkdir /sandman
 WORKDIR /sandman
-COPY ../requirements.txt /sandman/
+COPY ./requirements.txt /sandman/
 RUN pip install -r ./requirements.txt
