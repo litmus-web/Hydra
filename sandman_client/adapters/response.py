@@ -1,5 +1,7 @@
 from typing import Union, Optional
 
+from ..codes import OpCodes
+
 
 class OutGoingResponse:
     def __init__(
@@ -24,6 +26,7 @@ class OutGoingResponse:
 
     def to_dict(self):
         return {
+            "op": OpCodes.HTTP_REQUEST,
             "request_id": self.req_id,
             "status": self.status,
             "headers": self.headers,

@@ -103,6 +103,7 @@ type OutGoingRequest struct {
 }
 
 type ASGIResponse struct {
+	OpCode    int              `json:"op"`
 	Meta      IncomingMetadata `json:"meta_data"`
 	RequestId uint64           `json:"request_id"`
 	Type      string           `json:"type"`
@@ -117,6 +118,7 @@ type IncomingMetadata struct {
 }
 
 type ShardIdentify struct {
+	OpCode  int    `json:"op"`
 	ShardId string `json:"shard_id"`
 }
 
@@ -236,7 +238,6 @@ func handleRead(conn *websocket.Conn, c chan ShardIdentify) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(s)
 	c <- s
 
 	pair := acquireShard(s.ShardId)

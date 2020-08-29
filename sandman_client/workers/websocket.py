@@ -8,7 +8,9 @@ from typing import Any
 from dataclasses import dataclass
 from aiohttp import WSMessage, WSMsgType, ClientConnectionError
 
+from ..codes import OpCodes
 from ..helpers import dumps_data, load_data, JSONDecodeError
+
 
 __all__ = ["WebsocketShard", "AutoShardedWorker", "InternalResponses"]
 
@@ -37,13 +39,6 @@ class InternalResponses:
     CONNECTION_FAILED = ConnectionFailed()
     CLOSED_NATURALLY = ClosedNaturally()
     CLOSED_ABNORMALLY = ClosedAbnormally()
-
-
-@dataclass(frozen=True)
-class OpCodes:
-    IDENTIFY = 0
-    HTTP_REQUEST = 1
-    MESSAGE = 2
 
 
 class WebsocketShard:
@@ -152,6 +147,7 @@ class WebsocketShard:
         try:
             if data["op"] == 0:
                 ident = {
+                    "op": OpCodes.IDENTIFY,
                     "shard_id": self.shard_id
                 }
                 await ws.send_json(ident)
@@ -161,6 +157,7 @@ class WebsocketShard:
         except Exception as err:
             if data.get('op', -1) == 1:
                 data = {
+                    "op": OpCodes.HTTP_REQUEST,
                     "request_id": data["request_id"],
                     "status": 503,
                     "headers": [],

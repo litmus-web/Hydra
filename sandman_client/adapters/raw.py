@@ -1,10 +1,10 @@
 import asyncio
-import logging
 
 from typing import Coroutine, Any
 from aiohttp import ClientWebSocketResponse
 
 from ..helpers import dumps_data
+from ..codes import OpCodes
 
 
 class RawAdapter:
@@ -23,6 +23,7 @@ class RawAdapter:
 
     async def _handle_incoming(self, ws: ClientWebSocketResponse, req_id: int, msg: dict):
         first = {
+            "op": OpCodes.HTTP_REQUEST,
             "meta_data": {
                 "meta_response_type": "complete"
             },
@@ -35,11 +36,11 @@ class RawAdapter:
         }
         await ws.send_bytes(dumps_data(first))
 
-        #second = {
+        # second = {
+        #    "op": OpCodes.HTTP_REQUEST,
         #    "request_id": req_id,
         #    "type": "response.body",
         #    "body": "hello world",
-         #   "more_body": False
-        #}
-        #await ws.send_bytes(dumps_data(second))
-        
+        #   "more_body": False
+        # }
+        # await ws.send_bytes(dumps_data(second))

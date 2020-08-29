@@ -1,7 +1,7 @@
 from typing import Coroutine, Any
 
 from .response import OutGoingResponse
-
+from ..codes import OpCodes
 
 class ASGIAdapter:
     def __call__(self, msg: dict) -> Coroutine[Any, Any, OutGoingResponse]:

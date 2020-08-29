@@ -7,6 +7,7 @@ from typing import Coroutine, Any
 import typing
 
 from .response import OutGoingResponse
+from ..codes import OpCodes
 
 
 class ServerInfo:
