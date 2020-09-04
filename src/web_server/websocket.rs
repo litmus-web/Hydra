@@ -16,7 +16,7 @@ use headers::{self, HeaderMapExt};
 
 use serde_json;
 
-use crate::boilerplate::structs::*;
+use crate::web_server::structs::*;
 
 
 pub async fn handle_ws_connection(

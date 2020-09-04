@@ -4,7 +4,7 @@ use clap::{Arg, App, ArgMatches};
 // use std::process;
 use std::thread;
 
-mod boilerplate;
+mod web_server;
 
 
 fn main() {
@@ -17,7 +17,7 @@ fn main() {
         worker_count = matches.value_of("workers").unwrap().parse().unwrap();
     }
 
-    let server_config = boilerplate::server::Config{
+    let server_config = web_server::server::Config{
         addr: matches.value_of("host").unwrap().parse().unwrap(),
         port: matches.value_of("port").unwrap().parse().unwrap(),
     };
@@ -73,12 +73,12 @@ fn get_flags() -> ArgMatches<'static> {
          .get_matches()
 }
 
-fn spawn_processes(thead_no: usize, open_port: usize, server_config: boilerplate::server::Config) {
+fn spawn_processes(thead_no: usize, open_port: usize, server_config: web_server::server::Config) {
     println!(
         "[ Thread {} ] Starting Sandman worker binding to ws://127.0.0.1:{}/workers",
         thead_no,
         open_port
     );
-    boilerplate::create_boilerplate(open_port, server_config)
+    web_server::create_boilerplate(open_port, server_config)
 }
 

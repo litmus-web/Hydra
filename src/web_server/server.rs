@@ -22,8 +22,8 @@ use serde::{Serialize, Deserialize};
 
 
 /// Local references
-use crate::boilerplate::websocket::handle_ws_connection;
-use crate::boilerplate::structs::*;
+use crate::web_server::websocket::handle_ws_connection;
+use crate::web_server::structs::*;
 
 
 ///
