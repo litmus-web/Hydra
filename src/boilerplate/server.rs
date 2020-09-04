@@ -110,14 +110,10 @@ async fn run_server(free_port: usize, server_config: Config) -> io::Result<()> {
 async fn handle_incoming(req: Request<Body>, workers: Workers, cache: Cache) -> Result<Response<Body>, Error> {
     // Lets take our shard id
     let shard = String::from("1");
-    let shard_exists = workers.borrow().get(&shard).is_some();
 
-    // atomically increment the request id
-    let req_id = NEXT_USER_ID.fetch_add(1, Ordering::Relaxed);
-
-    // Produce our outgoing response from the request and id and
-    // send it to the ws.    
-    if !shard_exists {
+    // If the shard id we got doesnt exist lets return with a inactive worker status,
+    // just to be safe that we dont run into any errors.  
+    if !workers.borrow().get(&shard).is_some() {
         return Ok(
             Response::builder()
                 .status(StatusCode::from_u16(503).unwrap())
@@ -125,43 +121,30 @@ async fn handle_incoming(req: Request<Body>, workers: Workers, cache: Cache) -> 
                 .unwrap()
         );
     }
-        
+
+    // atomically increment the request id
+    let req_id = NEXT_USER_ID.fetch_add(1, Ordering::Relaxed);
+   
+    // Send it to the ws
     send_to_ws(
-            shard,
+            &shard,
             workers,
             get_outgoing(req, req_id.clone())
         ).await;  
-
-
-    let mut time_out_count: u16 = 0;
-    loop {
-        if cache.borrow().get(&req_id).is_some() { break }
-        delay_for(Duration::from_micros(15)).await;
-        if time_out_count >= 200 { break }
-        else { time_out_count += 1 }
-    }
-        
-    match cache.borrow_mut().remove(&req_id) {
-        Some(asgi_resp) => {
-            let headers: Vec<Vec<String>> = asgi_resp.headers.clone();
-            let status: u16 = asgi_resp.status;
     
-            let mut resp = Response::builder()
-                                .status(StatusCode::from_u16(status).unwrap());
-    
-            for v in headers.iter() {
-                resp = resp.header(v[0].as_str(), v[1].as_str()) 
-            }
-            resp.body(asgi_resp.clone().body.into())
-        },
-        _ => {
-            let resp = Response::builder()
-                            .status(StatusCode::from_u16(503).unwrap())
-                            .body("Server took too long to respond.".into()).unwrap();  
-            eprintln!("Server took too long to respond, Req Id: {}", req_id);
-            Ok(resp)
-        }
+    // This will block/suspend the task until we get a request back or
+    // it times out which will return a error instead.
+    let asgi_resp = wait_for_response(&req_id, &cache).await;
+
+    if asgi_resp.is_some() {
+        return Ok(build_response(asgi_resp.unwrap()).unwrap())
     } 
+    eprintln!("Server took too long to respond, Req Id: {}", req_id);
+
+    let resp = Response::builder()
+                    .status(StatusCode::from_u16(503).unwrap())
+                    .body("Server took too long to respond.".into()).unwrap();              
+    return Ok(resp)    
 }
 
 fn get_outgoing(mut req: Request<Body>, req_id: usize) -> OutGoingRequest {
@@ -187,10 +170,10 @@ fn get_outgoing(mut req: Request<Body>, req_id: usize) -> OutGoingRequest {
     }
 }
 
-async fn send_to_ws(shard_id: String, workers: Workers, outgoing: OutGoingRequest) {
+async fn send_to_ws(shard_id: &String, workers: Workers, outgoing: OutGoingRequest) {
     let _ = workers
                 .borrow()
-                .get(&String::from("main"))
+                .get(shard_id)
                 .unwrap()
                 .send(
                     Ok(
@@ -201,6 +184,31 @@ async fn send_to_ws(shard_id: String, workers: Workers, outgoing: OutGoingReques
                 );
 }
 
+async fn wait_for_response(req_id: &usize, cache: &Cache) -> Option<ASGIResponse> {
+    let mut time_out_count: u16 = 0;
+    loop {
+        if cache.borrow().get(&req_id).is_some() { 
+            let res = cache.borrow_mut().remove(&req_id);
+            if res.is_some() { return res }
+            else { return None }
+        }
+        delay_for(Duration::from_micros(15)).await;
+        if time_out_count >= 200 { 
+            return None
+        }
+        else { time_out_count += 1 }
+    }
+}
+
+fn build_response(asgi_resp: ASGIResponse) -> Result<Response<Body>, Error> {    
+    let mut resp = Response::builder()
+                        .status(StatusCode::from_u16(asgi_resp.status).unwrap());
+    
+    for v in asgi_resp.headers.clone().iter() {
+        resp = resp.header(v[0].as_str(), v[1].as_str()) 
+    }
+    resp.body(asgi_resp.clone().body.into())
+}
 
 
 
