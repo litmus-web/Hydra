@@ -3,7 +3,9 @@ use clap::{Arg, App, ArgMatches};
 
 use std::thread;
 
+mod process_management;
 mod web_server;
+mod boilerplate;
 
 /// The start of the application, this first gets any command line flags and parses them
 /// using `get_flags()`.<br><br>
@@ -20,6 +22,17 @@ fn main() {
 
     let adapter: String = matches.value_of("adapter").unwrap().parse().unwrap();
 
+    let worker_config = process_management::structs::WorkerConfig{
+        process_settings: process_management::structs::ProcessSettings{
+            command: "python"
+        },
+        worker_settings: process_management::structs::WorkerSettings{
+            id: "",
+            port: "",
+            adapter: ""
+        },
+    };
+
     let mut worker_count: usize = 1;
     if cfg!(unix) {
         worker_count = matches.value_of("workers").unwrap().parse().unwrap();
@@ -33,12 +46,23 @@ fn main() {
 
     for i in 1..worker_count {
         let temp_clone = server_config.clone();
+        let temp_worker_clone = worker_config.clone();
         thread::spawn(move || {
-            spawn_processes(i, 11234, temp_clone.clone())
+            spawn_processes(
+                i,
+                11234,
+                temp_clone.clone(),
+                temp_worker_clone.clone(),
+            )
         });
     }
 
-    spawn_processes(0, 11234, server_config.clone())
+    spawn_processes(
+        0,
+        11234,
+        server_config.clone(),
+        worker_config.clone(),
+    )
 }
 
 /// Uses clap to parse any CLI flags and returns them.
@@ -96,12 +120,23 @@ fn get_flags() -> ArgMatches<'static> {
 /// spawn_processes(thread_no, open_port, server_config);
 ///
 /// ```
-fn spawn_processes(thead_no: usize, open_port: usize, server_config: web_server::server::Config) {
+fn spawn_processes(
+    thead_no: usize,
+    open_port: usize,
+    server_config: web_server::server::Config,
+    worker_config: process_management::structs::WorkerConfig,
+
+
+) {
     println!(
         "[ Thread {} ] Starting Sandman worker binding to ws://127.0.0.1:{}/workers",
         thead_no,
         open_port
     );
-    web_server::create_boilerplate(open_port, server_config)
+    boilerplate::create_boilerplate(
+        open_port,
+        server_config,
+        worker_config
+    )
 }
 
