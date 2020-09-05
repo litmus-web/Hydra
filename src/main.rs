@@ -1,7 +1,6 @@
-extern crate clap;
-use clap::{Arg, App, ArgMatches};
-
 use std::thread;
+use clap::{Arg, App, ArgMatches};
+use colored::*;
 
 mod process_management;
 mod web_server;
@@ -43,26 +42,20 @@ fn main() {
         port: matches.value_of("port").unwrap().parse().unwrap(),
     };
 
-
-    for i in 1..worker_count {
-        let temp_clone = server_config.clone();
-        let temp_worker_clone = worker_config.clone();
-        thread::spawn(move || {
-            spawn_processes(
-                i,
-                11234,
-                temp_clone.clone(),
-                temp_worker_clone.clone(),
-            )
-        });
+    let mut mode = "single-threaded".red();
+    if worker_count > 1 {
+        mode = "multi-threaded".red();
     }
 
-    spawn_processes(
-        0,
-        11234,
-        server_config.clone(),
-        worker_config.clone(),
-    )
+    let status = "[ Start up ]".green();
+    println!("{} Starting Sandman @ http://{}:{}/", status, server_config.addr, server_config.port);
+    println!("{} Running in {} mode:", status, mode);
+    println!("{}      - Workers: {}", status, worker_count);
+    println!("{}      - Target Port: {}", status, server_config.port);
+    println!("{}      - Target address: {}", status, server_config.addr);
+
+
+    start_all(worker_count, server_config, worker_config);
 }
 
 /// Uses clap to parse any CLI flags and returns them.
@@ -106,6 +99,33 @@ fn get_flags() -> ArgMatches<'static> {
          .get_matches()
 }
 
+/// Starts n amount of workers and servers according to the worker_count param.
+fn start_all(
+    worker_count: usize,
+    server_config: web_server::server::Config,
+    worker_config: process_management::structs::WorkerConfig,
+) {
+    for i in 1..worker_count {
+        let temp_clone = server_config.clone();
+        let temp_worker_clone = worker_config.clone();
+        thread::spawn(move || {
+            spawn_processes(
+                i,
+                11234,
+                temp_clone.clone(),
+                temp_worker_clone.clone(),
+            )
+        });
+    }
+
+    spawn_processes(
+        0,
+        11234,
+        server_config.clone(),
+        worker_config.clone(),
+    )
+}
+
 /// spawn_processes is responsible for starting the boilerplate setup that intern runs the server
 ///
 /// **Example**
@@ -128,11 +148,15 @@ fn spawn_processes(
 
 
 ) {
+    let ident = format!("[ Thread {} ]", thead_no).cyan();
+    println!("{} Creating boilerplate...", ident);
+
     println!(
-        "[ Thread {} ] Starting Sandman worker binding to ws://127.0.0.1:{}/workers",
-        thead_no,
+        "{} Starting Sandman worker binding to ws://127.0.0.1:{}/workers",
+        ident,
         open_port
     );
+
     boilerplate::create_boilerplate(
         open_port,
         server_config,
