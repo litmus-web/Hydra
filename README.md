@@ -6,7 +6,7 @@ Sandman aims to provide a unviseral fit for WSGI/ASGI or any other interface for
 Compatible with both Windows and POSIX operating systems providing top performance for both systems regardless of uvloop or other speedup limitations.<br>
 
 ## How does it work?
-Sandman has a main server (acting in place of Nginx or Apache but can operate behind them as well) written in Go lang using Fast HTTP, any http requests then are sent to python workers as Websocket requests with the aim to remove any heavy lifting from Python to allow for faster applications and lighter tasks, typically running with a lower average latency and higher requests a second.
+Sandman has a main server (acting in place of Nginx or Apache but can operate behind them as well) written in Rust lang using Hyper, any http requests then are sent to python workers as Websocket requests with the aim to remove any heavy lifting from Python to allow for faster applications and lighter tasks, typically running with a lower average latency and higher requests a second.
 
 ## What can it do?
 - Serve static files with a production grade compiled server.
