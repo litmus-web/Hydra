@@ -1,7 +1,7 @@
 # Using Hydra Webserver
 Welcome to the Hydra usage docs, this will show you how to setup Hydra to run on your system.
 
-## A Basic GGuide
+## A Basic Guide
 ### 1) Installing Dependancies
 - You can install Hydra using `pip install hydra-client` **this isntalls the client only for Python**, 
 - You will need to compile the main server (the `hydra` folder) to a executable from source or download one of our read made binaries.
