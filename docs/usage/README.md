@@ -70,4 +70,4 @@ Hey presto! We now have a running server!
 
 - `--reducememory` - Start the server in reduce memory mode, this will try to minimuse the amount of memory used. (May effect performance)
 
-- `maxreqsize` - Specify the maximum body size allowed in a request, useful if you want to protect your server from attacks.
+- `--maxreqsize` - Specify the maximum body size allowed in a request, useful if you want to protect your server from attacks.
