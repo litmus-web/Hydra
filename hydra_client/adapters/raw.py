@@ -18,7 +18,7 @@ class RawAdapter:
             "request_id": req_id,
             "type": "response.start",
             "status": 200,
-            "headers": (),
+            "headers": (("hello", "world"),),
             "body": "hello world",
             "more_body": False
         }

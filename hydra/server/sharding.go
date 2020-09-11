@@ -1,9 +1,9 @@
 package server
 
 import (
+	"github.com/cornelk/hashmap"
 	"github.com/fasthttp/websocket"
 	"log"
-	"sync"
 )
 
 var (
@@ -12,38 +12,29 @@ var (
 
 func init() {
 	shardManager = ShardManager{
-		shards:     make(map[uint64]*Shard),
-		shardsLock: sync.RWMutex{},
+		shards: &hashmap.HashMap{},
 	}
 }
 
 type ShardManager struct {
-	shards     map[uint64]*Shard
-	shardsLock sync.RWMutex
+	shards *hashmap.HashMap // map[uint64]*Shard
 }
 
 func (sm *ShardManager) AddShard(shard *Shard) {
-	sm.shardsLock.Lock()
-	defer sm.shardsLock.Unlock()
-	sm.shards[shard.ShardId] = shard
+	sm.shards.Set(shard.ShardId, shard)
 }
 
 func (sm *ShardManager) RemoveShard(shardId uint64) {
-	sm.shardsLock.Lock()
-	defer sm.shardsLock.Unlock()
-	delete(sm.shards, shardId)
+	sm.shards.Del(shardId)
 }
 
-func (sm *ShardManager) SubmitToShard(shardId uint64, out OutgoingShardPayload, recv chan IncomingResponse) bool {
-	sm.shardsLock.RLock()
-	s := sm.shards[shardId]
-	if s == nil {
-		sm.shardsLock.RUnlock()
+func (sm *ShardManager) SubmitToShard(shardId uint64, out *OutgoingRequest, recv chan IncomingResponse) bool {
+	s, ok := sm.shards.Get(shardId)
+	if !ok {
 		return false
 	}
-	s.SubmitRequest(out, recv)
-
-	sm.shardsLock.RUnlock()
+	shard := (s).(*Shard)
+	shard.SubmitRequest(out, recv)
 	return true
 }
 
@@ -51,11 +42,9 @@ func (sm *ShardManager) SubmitToShard(shardId uint64, out OutgoingShardPayload, 
 type Shard struct {
 	ShardId uint64
 
-	OutgoingChannel chan OutgoingRequest
+	OutgoingChannel chan *OutgoingRequest
 
-
-	RecvCache map[uint64]chan IncomingResponse
-	RecvLock sync.Mutex
+	RecvCache *hashmap.HashMap
 
 	conn *websocket.Conn
 }
@@ -64,12 +53,9 @@ func (s *Shard) SetConn(conn *websocket.Conn) {
 	s.conn = conn
 }
 
-func (s *Shard) SubmitRequest(request OutgoingShardPayload, recv chan IncomingResponse) {
-	s.OutgoingChannel <- request.Outgoing
-
-	s.RecvLock.Lock()
-	s.RecvCache[request.Outgoing.RequestId] = recv
-	s.RecvLock.Unlock()
+func (s *Shard) SubmitRequest(request *OutgoingRequest, recv chan IncomingResponse) {
+	s.OutgoingChannel <- request
+	s.RecvCache.GetOrInsert(request.RequestId, recv)
 }
 
 func (s *Shard) Start() {
@@ -77,32 +63,31 @@ func (s *Shard) Start() {
 	s.handleWrite()
 }
 
-func (s *Shard) handleWrite()   {
-	var outgoing OutgoingRequest
+func (s *Shard) handleWrite() {
+	var outgoing *OutgoingRequest
 	for outgoing = range s.OutgoingChannel {
 		_ = s.conn.WriteJSON(outgoing)
 	}
 }
 
-func (s *Shard) handleRead()   {
-	var incoming IncomingResponse
+func (s *Shard) handleRead() {
 	var err error
-	var chann chan IncomingResponse
 	var ok bool
+	var channel interface{}
+	var cha chan IncomingResponse
+
+	incoming := IncomingResponse{}
 
 	for {
-		incoming = IncomingResponse{}
 		err = s.conn.ReadJSON(&incoming)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		s.RecvLock.Lock()
-		if chann, ok = s.RecvCache[incoming.RequestId]; ok {
-			chann <- incoming
-			// delete(s.RecvCache, incoming.RequestId)
+		channel, ok = s.RecvCache.Get(incoming.RequestId)
+		if ok {
+			cha = (channel).(chan IncomingResponse)
+			cha <- incoming
 		}
-		s.RecvLock.Unlock()
 	}
 }
-

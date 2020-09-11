@@ -12,21 +12,27 @@ import (
 
 var (
 	nextResponseId uint64 = 0
-    countPool = sync.Pool{
+	countPool             = sync.Pool{
 		New: func() interface{} {
 			atomic.AddUint64(&nextResponseId, 1)
-			return nextResponseId
+			newId := nextResponseId
+			return RequestPack{
+				ReqId:       newId,
+				RecvChannel: make(chan IncomingResponse),
+				ModRequest: OutgoingRequest{
+					Op:        1,
+					RequestId: newId,
+				},
+			}
 		},
 	}
 )
 
-
-
+/*
+	startMainServer (public) starts the pre-forking FastHTTP server binding to the
+	set address of `mainHost`
+*/
 func StartMainServer(mainHost string, workerCount int) {
-	/*
-		startMainServer (public) starts the pre-forking FastHTTP server binding to the
-		set address of `mainHost`
-	*/
 	server := &fasthttp.Server{
 		Handler: anyHTTPHandler,
 	}
@@ -43,40 +49,36 @@ func StartMainServer(mainHost string, workerCount int) {
 }
 
 func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
-	myId := countPool.Get().(uint64)
+	reqHelper := countPool.Get().(RequestPack)
 
-	toGo := OutgoingShardPayload {
-		OutgoingRequest{
-			Op: 1,
-			RequestId: myId,
-			Method:    string(ctx.Method()),
-			Remote:    ctx.RemoteAddr().String(),
-			Path:      string(ctx.Path()),
-			Headers:   ctx.Request.Header.String(),
-			Version:   "HTTP/1.1",
-			Body:      "",
-			Query:     ctx.QueryArgs().String(),
-		},
-	}
+	reqHelper.ModRequest.Method = string(ctx.Method())
+	reqHelper.ModRequest.Remote = ctx.RemoteAddr().String()
+	reqHelper.ModRequest.Path = string(ctx.Path())
+	reqHelper.ModRequest.Headers = ctx.Request.Header.String()
+	reqHelper.ModRequest.Version = "HTTP/1.1"
+	reqHelper.ModRequest.Body = ""
+	reqHelper.ModRequest.Query = ctx.QueryArgs().String()
 
 	var shardId uint64
 	shardId = 1
 
-	myChannel := make(chan  IncomingResponse)
-	exists := shardManager.SubmitToShard(shardId, toGo, myChannel)
+	exists := shardManager.SubmitToShard(shardId, &reqHelper.ModRequest, reqHelper.RecvChannel)
 
 	if !exists {
 		ctx.SetStatusCode(503)
 		_, _ = fmt.Fprintf(ctx, "Internal Server error: Shard with Id: %v does not exist.", shardId)
 		return
 	}
-	_ =<-myChannel
-	countPool.Put(myId)
 
-	ctx.SetStatusCode(200)
-	ctx.SetBody([]byte("Hello World"))
-	//var out IncomingResponse
-	//for out = range recv {
-	//	fmt.Println(out)
-	//}
+	response := <-reqHelper.RecvChannel
+
+	countPool.Put(reqHelper)
+
+	ctx.SetStatusCode(response.Status)
+	ctx.SetBodyString(response.Body)
+
+	var head []string
+	for _, head = range response.Headers {
+		ctx.Response.Header.Set(head[0], head[1])
+	}
 }

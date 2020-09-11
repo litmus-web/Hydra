@@ -2,15 +2,15 @@ package server
 
 import (
 	"fmt"
-	"sync"
 	"sync/atomic"
 
+	"github.com/cornelk/hashmap"
 	"github.com/fasthttp/websocket"
 	"github.com/valyala/fasthttp"
 )
 
 var (
-    nextShardId uint64 = 0
+	nextShardId uint64 = 0
 
 	upgrader = websocket.FastHTTPUpgrader{
 		ReadBufferSize:  1024,
@@ -52,11 +52,11 @@ func upgradedWebsocket(conn *websocket.Conn) {
 
 	shard := Shard{
 		ShardId:         nextShardId,
-		OutgoingChannel: make(chan OutgoingRequest),
-		RecvLock:     	 sync.Mutex{},
-		RecvCache: 		 make(map[uint64]chan IncomingResponse),
+		OutgoingChannel: make(chan *OutgoingRequest),
+		RecvCache:       &hashmap.HashMap{},
 		conn:            conn,
 	}
+
 	shardManager.AddShard(&shard)
 
 	shard.Start()
