@@ -1,4 +1,4 @@
-[![CodeFactor](https://www.codefactor.io/repository/github/project-dream-weaver/sandman/badge)](https://www.codefactor.io/repository/github/project-dream-weaver/sandman)
+[![CodeFactor](https://www.codefactor.io/repository/github/project-dream-weaver/hydra/badge)](https://www.codefactor.io/repository/github/project-dream-weaver/hydra)
 
 # The universal production server for python
 Hydra aims to provide a unviseral fit for WSGI/ASGI or any other interface for frameworks through a mutual connection while also boosting performance and adding the ability for stateful worker processes.<br>
