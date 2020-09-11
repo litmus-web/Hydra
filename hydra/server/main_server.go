@@ -48,13 +48,19 @@ func StartMainServer(mainHost string, workerCount int) {
 	}
 }
 
+func parseHeaders(ctx *fasthttp.RequestCtx) string {
+	return ctx.Request.Header.String()
+}
+
 func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
 	reqHelper := countPool.Get().(RequestPack)
+
+	reqHelper.ModRequest.Headers = parseHeaders(ctx)
+	recover()
 
 	reqHelper.ModRequest.Method = string(ctx.Method())
 	reqHelper.ModRequest.Remote = ctx.RemoteAddr().String()
 	reqHelper.ModRequest.Path = string(ctx.Path())
-	reqHelper.ModRequest.Headers = ctx.Request.Header.String()
 	reqHelper.ModRequest.Version = "HTTP/1.1"
 	reqHelper.ModRequest.Body = ""
 	reqHelper.ModRequest.Query = ctx.QueryArgs().String()

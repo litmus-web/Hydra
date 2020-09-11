@@ -50,7 +50,6 @@ var (
 	//	"maxreqsize", 0, "The maximum body size allowed in a request.")
 )
 
-
 func main() {
 	flag.Parse()
 
@@ -61,10 +60,15 @@ func main() {
 	}
 
 	free, err := getFreePort()
-	if err != nil { log.Fatalln(err) }
+	if err != nil {
+		log.Fatalln(err)
+	}
 	startServers(*host, free, *workerCount)
 }
 
+// Starts the main servers, it will only start worker servers if
+// the process is a child because the main thread is used for
+// process management and does not connect to a socket.
 func startServers(host string, freePort int, workerCount int) {
 	if prefork.IsChild() {
 		go server.StartWorkerServer(freePort)
@@ -72,6 +76,7 @@ func startServers(host string, freePort int, workerCount int) {
 	server.StartMainServer(host, workerCount)
 }
 
+// Produces a free port from polling the OS.
 func getFreePort() (int, error) {
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
 	if err != nil {
