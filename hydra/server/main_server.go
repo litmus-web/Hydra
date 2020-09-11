@@ -56,7 +56,13 @@ func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
 	reqHelper := countPool.Get().(RequestPack)
 
 	reqHelper.ModRequest.Headers = parseHeaders(ctx)
-	recover()
+	err := recover().(error)
+	if err != nil {
+		ctx.SetStatusCode(400)
+		ctx.SetBodyString("Invalid request")
+		countPool.Put(reqHelper)
+		return
+	}
 
 	reqHelper.ModRequest.Method = string(ctx.Method())
 	reqHelper.ModRequest.Remote = ctx.RemoteAddr().String()
