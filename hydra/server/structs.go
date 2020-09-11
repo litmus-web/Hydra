@@ -1,5 +1,7 @@
 package server
 
+import "github.com/valyala/fastjson"
+
 type OutgoingRequest struct {
 	Op        int    `json:"op"`
 	RequestId uint64 `json:"request_id"`
@@ -13,14 +15,14 @@ type OutgoingRequest struct {
 }
 
 type IncomingResponse struct {
-	Op        int              `json:"op"`
-	Meta      IncomingMetadata `json:"meta_data"`
-	RequestId uint64           `json:"request_id"`
-	Type      string           `json:"type"`
-	Status    int              `json:"status"`
-	Headers   [][]string       `json:"headers"`
-	Body      string           `json:"body"`
-	MoreBody  bool             `json:"more_body"`
+	Op        int               `json:"op"`
+	Meta      []byte            `json:"meta_data"`
+	RequestId uint64            `json:"request_id"`
+	Type      []byte            `json:"type"`
+	Status    int               `json:"status"`
+	Headers   []*fastjson.Value `json:"headers"`
+	Body      []byte            `json:"body"`
+	MoreBody  bool              `json:"more_body"`
 }
 
 type IncomingMetadata struct {

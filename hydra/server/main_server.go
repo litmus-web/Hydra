@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/valyala/fastjson"
 	"sync"
 	"sync/atomic"
 
@@ -75,10 +76,11 @@ func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
 	countPool.Put(reqHelper)
 
 	ctx.SetStatusCode(response.Status)
-	ctx.SetBodyString(response.Body)
+	ctx.SetBody(response.Body)
 
-	var head []string
+	var head []*fastjson.Value
 	for _, head = range response.Headers {
-		ctx.Response.Header.Set(head[0], head[1])
+		ctx.Response.Header.SetBytesKV(
+			head[0].GetStringBytes(), head[1].GetStringBytes())
 	}
 }
