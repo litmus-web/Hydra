@@ -45,3 +45,29 @@ Hey presto! We now have a running server!
 
 ## Options And Configuration
 
+ **Required**
+- `--app` - The target file and app callable seperated by a `:`, e.g. `my_file:app`
+- `--adapter` - The adapter type, this can be `asgi`, `wsgi` or `raw` depending on your framework 
+
+ **General**
+- `--host` - The binding host address and port, e.g. `0.0.0.0:5050`<br>
+        **Default:** `127.0.0.1:8080`<br>
+        
+- `--workers` - The amount of workers to spawn, the amount of processes spawned is equal to `2 * workers + 1`<br>
+        **Recommeneded:** `2 * num_threads`<br>
+        **Default:** `1` worker<br>
+
+**Low Level Control**
+- `--shardsperproc` - Set the amount of WS connections (Shards) to connect to Hydra, you should only use this if you are doing very specific load balancing.
+
+- `--name` - Sets the server name.
+
+- `--maxconnperip` - Sets the maximum number of client connections per IP.
+
+- `--maxreqperconn` - The maximum number of requests allowed per connection.
+
+- `--tcpkeepalive` - Enable/Disable TCP keep alive.
+
+- `--reducememory` - Start the server in reduce memory mode, this will try to minimuse the amount of memory used. (May effect performance)
+
+- `maxreqsize` - Specify the maximum body size allowed in a request, useful if you want to protect your server from attacks.
