@@ -14,18 +14,35 @@ func init() {
 	}
 }
 
+/*
+	The master controller per proc that controls all
+	shard related IO and control.
+*/
 type ShardManager struct {
 	shards *hashmap.HashMap // map[uint64]*Shard
 }
 
+/*
+	Used to add a shard type to the manager, allowing for easy access and control
+	later on down the line of development.
+*/
 func (sm *ShardManager) AddShard(shard *Shard) {
 	sm.shards.Set(shard.ShardId, shard)
 }
 
+/*
+	Used to remove a shard type of a given id from the manager and
+	therefore removing it from the web server's usage.
+*/
 func (sm *ShardManager) RemoveShard(shardId uint64) {
 	sm.shards.Del(shardId)
 }
 
+/*
+	Use this for submitting requests to the server, it handles getting the shard
+	from the hashmap and then submitting it to the shard, returning a bool to
+	signal if the shard exists and has been sent the data or not.
+*/
 func (sm *ShardManager) SubmitToShard(shardId uint64, out *OutgoingRequest, recv chan IncomingResponse) bool {
 	s, ok := sm.shards.Get(shardId)
 	if !ok {
