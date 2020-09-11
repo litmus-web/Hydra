@@ -42,3 +42,6 @@ After we've added the nessesary code to our files we can run the server using:
 
 Hey presto! We now have a running server!
 
+
+## Options And Configuration
+
