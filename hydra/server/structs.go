@@ -1,5 +1,12 @@
 package server
 
+/*
+	Represents a client request (minus the body)
+	this contains anything needed for the workers
+	to use, the body is dedicated code to support
+	cross process body streams without making everything
+	else over complicated.
+*/
 type OutgoingRequest struct {
 	Op        int    `json:"op"`
 	RequestId uint64 `json:"request_id"`
@@ -12,6 +19,12 @@ type OutgoingRequest struct {
 	Query     string `json:"query"`
 }
 
+/*
+	The main struct representing a incoming WS response,
+	this wraps the `IncomingMetadata` struct to and all data
+	is fed back into the external http request excluding,
+	RequestId, Meta and Op Values.
+*/
 type IncomingResponse struct {
 	Op        int              `json:"op"`
 	Meta      IncomingMetadata `json:"meta_data"`
@@ -24,26 +37,26 @@ type IncomingResponse struct {
 }
 
 /*
-Represents internal metadata, used for optimising
-requests, small bodies aren't work sending as a separate
-thing so instead we just send it in one go.
+	Represents internal metadata, used for optimising
+	requests, small bodies aren't work sending as a separate
+	thing so instead we just send it in one go.
 
-This can be represented by the following:
+	This can be represented by the following:
 
-- partial: signals the the request is in chunks
-- complete: signals that all content is in the one request.
+	- partial: signals the the request is in chunks
+	- complete: signals that all content is in the one request.
 */
 type IncomingMetadata struct {
 	ResponseType string `json:"meta_response_type"`
 }
 
 /*
-RequestPack acts like a zip up of required vars
-like Request id, receiver channel, outgoing request.
+	RequestPack acts like a zip up of required vars
+	like Request id, receiver channel, outgoing request.
 
 
-This is used heavily for recycling variables to reduce
-the load on the gc to aid performance, every little helps.
+	This is used heavily for recycling variables to reduce
+	the load on the gc to aid performance, every little helps.
 */
 type RequestPack struct {
 	ReqId       uint64
