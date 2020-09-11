@@ -6,9 +6,7 @@ import (
 	"log"
 )
 
-var (
-	shardManager ShardManager
-)
+var shardManager ShardManager
 
 func init() {
 	shardManager = ShardManager{
