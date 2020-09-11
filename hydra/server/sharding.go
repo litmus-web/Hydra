@@ -3,7 +3,6 @@ package server
 import (
 	"github.com/cornelk/hashmap"
 	"github.com/fasthttp/websocket"
-	"github.com/valyala/fastjson"
 	"log"
 )
 
@@ -77,23 +76,13 @@ func (s *Shard) handleRead() {
 	var channel interface{}
 	var cha chan IncomingResponse
 
-	var p fastjson.Parser
-	var msg []byte
-	var v *fastjson.Value
-
 	incoming := IncomingResponse{}
 
 	for {
-		_, msg, err = s.conn.ReadMessage()
+		err = s.conn.ReadJSON(&incoming)
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		v, err = p.ParseBytes(msg)
-		if err != nil {
-			log.Fatal(err)
-		}
-		parseMsg(v, &incoming)
 
 		channel, ok = s.RecvCache.Get(incoming.RequestId)
 		if ok {
@@ -101,18 +90,4 @@ func (s *Shard) handleRead() {
 			cha <- incoming
 		}
 	}
-}
-
-func parseMsg(v *fastjson.Value, ir *IncomingResponse) {
-	ir.Op = v.GetInt("op")
-	ir.RequestId = v.GetUint64("request_id")
-
-	ir.Meta = v.GetStringBytes("meta_data")
-	ir.Type = v.GetStringBytes("type")
-	ir.Status = v.GetInt("status")
-
-	ir.Body = v.GetStringBytes("body")
-	ir.MoreBody = v.GetBool("more_body")
-
-	ir.Headers = v.GetArray("headers")
 }
