@@ -34,9 +34,10 @@ if __name__ == "__main__":
   run()
 ```  
 
-After we've added the nessesary code to our files we can run the server!
+### 3) Running with CLI
+After we've added the nessesary code to our files we can run the server using:
 
-**Running the server**
+
 `hydra --app "my_file:app" --adapter "asgi" --host "0.0.0.0:5050"`
 
 Hey presto! We now have a running server!
