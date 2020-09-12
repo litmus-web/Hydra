@@ -4,3 +4,4 @@
 /import_test.py
 
 *.pyc
+/tests/server/hydra_client/

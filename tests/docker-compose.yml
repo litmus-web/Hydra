@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  wrk:
+    build: ./benchmarker
+    container_name: wrk
+    restart: "no"
+    command: python "./benchmarker/run.py"
+    ports:
+      - "80:80"
+  server:
+    build: ./server
+    container_name: hydra_server
+    restart: "no"
+    command: hydra "./server/server_runner.py"
+    volumes:
+      - .:/code
