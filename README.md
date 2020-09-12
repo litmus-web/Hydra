@@ -17,7 +17,7 @@ Hydra has a main server (acting in place of Nginx or Apache but can operate behi
 - Minimal dependancies.
 - Windows, Linux and MacOS compatible, anything that runs on windows runs on linux without the need for changing anything on the server and vice versa.
 
-## How well does is perform?
+## How well does it perform?
 Although i have only done testing benchmarks the results are promising! On a windows system Hydra averages a **125%** requests/sec increase when benching against [Uvicorn](https://www.uvicorn.org/), Although this is windows and nothing is ever as good as it could be :P
 
 On linux the last tests we did we averaged about a **30%** request/sec increase with [Uvicorn](https://www.uvicorn.org/) running with Uvloop and Hydra running on pure python with zero speed ups (Hydra is based off of AyncIO and would also benifit heavily from AioHTTP's speedups option and uvloop installs).
