@@ -52,6 +52,12 @@ func parseHeaders(ctx *fasthttp.RequestCtx) string {
 	return ctx.Request.Header.String()
 }
 
+/*
+	Any external request goes through here first
+	all parsing, caching and checks are done then handed
+	off to the workers, this is really useful if you want
+	to remove load from python via caching or request blocking.
+*/
 func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
 	reqHelper := countPool.Get().(RequestPack)
 
