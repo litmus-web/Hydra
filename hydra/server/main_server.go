@@ -106,7 +106,7 @@ func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
 	reqHelper.ModRequest.Remote = ctx.RemoteAddr().String()
 	reqHelper.ModRequest.Path = string(ctx.Path())
 	reqHelper.ModRequest.Version = "HTTP/1.1"
-	reqHelper.ModRequest.Body = ""
+	reqHelper.ModRequest.Body = string(ctx.PostBody())
 	reqHelper.ModRequest.Query = ctx.QueryArgs().String()
 
 	exists := shardManager.SubmitToShard(reqHelper.ShardId, &reqHelper.ModRequest, reqHelper.RecvChannel)
