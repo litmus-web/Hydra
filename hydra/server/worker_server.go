@@ -41,10 +41,10 @@ func StartWorkerServer(workerManager process_manager.ExternalWorkers) error {
 
 	ended := make(chan error)
 
-	//go func() {
-	//		workerManager.StartExternalWorkers()
-	//		ended <- nil
-	//}()
+	go func() {
+		workerManager.StartExternalWorkers()
+		ended <- nil
+	}()
 
 	go func() {
 		binding := fmt.Sprintf("127.0.0.1:%v", workerManager.ConnectionPort)

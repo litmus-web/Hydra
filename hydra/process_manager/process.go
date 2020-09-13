@@ -80,7 +80,7 @@ func (ew *ExternalWorkers) doCommand() (*exec.Cmd, error) {
 	proc := exec.Command(
 		ew.RunnerCall,
 		formatArgs(
-			toString("", ew.TargetFile),
+			toString("", fmt.Sprintf("%s.py", ew.TargetFile)),
 			toString("--app", ew.App),
 			toString("--adapter", ew.Adapter),
 			toString("--port", ew.ConnectionPort),
