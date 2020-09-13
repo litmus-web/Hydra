@@ -1,7 +1,5 @@
 package server
 
-import "github.com/valyala/fasthttp"
-
 /*
 	Represents a client request (minus the body)
 	this contains anything needed for the workers
@@ -10,15 +8,15 @@ import "github.com/valyala/fasthttp"
 	else over complicated.
 */
 type OutgoingRequest struct {
-	Op        int               `json:"op"`
-	RequestId uint64            `json:"request_id"`
-	Method    string            `json:"method"`
-	Remote    string            `json:"remote"`
-	Path      string            `json:"path"`
-	Headers   [][]string        `json:"headers"`
-	Version   string            `json:"version"`
-	Body      *fasthttp.Request `json:"body"`
-	Query     string            `json:"query"`
+	Op        int        `json:"op"`
+	RequestId uint64     `json:"request_id"`
+	Method    string     `json:"method"`
+	Remote    string     `json:"remote"`
+	Path      string     `json:"path"`
+	Headers   [][]string `json:"headers"`
+	Version   string     `json:"version"`
+	Body      string     `json:"body"`
+	Query     string     `json:"query"`
 }
 
 /*
