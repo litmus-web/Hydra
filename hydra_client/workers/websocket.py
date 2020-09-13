@@ -64,11 +64,14 @@ class WebsocketShard:
             binding_addr: str,
             request_callback: typing.Union[typing.Coroutine[Any, Any, None], typing.Callable],
             msg_callback: typing.Union[typing.Coroutine[Any, Any, None], typing.Callable],
+            authorization: str,
     ):
         self.shard_id = shard_id
         self.binding_addr = binding_addr
         self.req_callback = request_callback
         self.msg_callback = msg_callback
+        self._authorization = authorization
+
         self.session = None
         self.loop = asyncio.get_event_loop()
 
@@ -77,7 +80,9 @@ class WebsocketShard:
         self.session = aiohttp.ClientSession()
         log_info("Shard initiated client session")
         try:
-            async with self.session.ws_connect(self.binding_addr) as ws:
+            async with self.session.ws_connect(
+                    self.binding_addr, headers={"Authorization": self._authorization}) as ws:
+
                 await self.on_connect(ws)
 
                 while not ws.closed:
@@ -193,6 +198,7 @@ class AutoShardedWorker:
             binding_addr: str,
             request_callback: typing.Union[typing.Coroutine[Any, Any, None], typing.Callable],
             msg_callback: typing.Union[typing.Coroutine[Any, Any, None], typing.Callable],
+            authorization: str,
             shard_count: int = 1,
             shard_restart_limit: typing.Optional[int] = None,
     ):
@@ -200,6 +206,7 @@ class AutoShardedWorker:
         self.binding_addr = binding_addr
         self.req_callback = request_callback
         self.msg_callback = msg_callback
+        self._authorization = authorization
 
         if shard_restart_limit is None:
             self.shard_restart_limit = shard_count * 2
@@ -226,6 +233,7 @@ class AutoShardedWorker:
             self.binding_addr,
             self.req_callback,
             self.msg_callback,
+            self._authorization,
         )
         task = self._loop.create_task(shard.connect())
         self._shards[shard_id] = task

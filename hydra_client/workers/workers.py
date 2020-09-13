@@ -28,6 +28,7 @@ class Worker:
             app: str,
             port: int,
             shard_count: int,
+            authorization: str,
             adapter: typing.Union[WSGIAdapter, ASGIAdapter, RawAdapter],
     ):
         self._app = _get_app(app)
@@ -41,6 +42,7 @@ class Worker:
             worker_addr,
             self._on_http_request,
             self._on_internal_message,
+            authorization,
             shard_count=shard_count
         )
 

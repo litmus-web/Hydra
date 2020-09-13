@@ -15,11 +15,11 @@ from .adapters.raw import RawAdapter
 
 
 flags = argparse.ArgumentParser()
-flags.add_argument("--child", type=bool, required=True)
 flags.add_argument("--app", type=str, required=True)
 flags.add_argument("--adapter", type=str, required=True)
 flags.add_argument("--port", type=int, required=True)
 flags.add_argument("--shards", type=int, required=True)
+flags.add_argument("--auth", type=str, required=True)
 
 
 adapters = {
@@ -38,6 +38,7 @@ def run() -> None:
         app=parsed.app,
         port=parsed.port,
         shard_count=parsed.shards,
+        authorization=parsed.auth,
         adapter=adapter()
     )
     return asyncio.get_event_loop().run_until_complete(worker.run())
