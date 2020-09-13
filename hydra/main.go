@@ -3,8 +3,10 @@ package main
 import (
 	"flag"
 	"log"
+	"math/rand"
 	"net"
 	"strings"
+	"time"
 
 	"./prefork"
 	"./process_manager"
@@ -63,6 +65,10 @@ var (
 	//	"maxreqsize", 0, "The maximum body size allowed in a request.")
 )
 
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
 func main() {
 	flag.Parse()
 
@@ -96,21 +102,21 @@ func main() {
 		ConnectionPort: free,
 		WorkerCount:    *processRatio,
 		ShardsPerProc:  *shardsPerProc,
-		WorkerAuth:     "",
+		WorkerAuth:     randStringBytes(16),
 	}
 
-	startServers(*host, *workerCount, free, manager)
+	startServers(*host, *workerCount, manager)
 }
 
 // Starts the main servers, it will only start worker servers if
 // the process is a child because the main thread is used for
 // process management and does not connect to a socket.
-func startServers(host string, workerCount int, freePort int, workerManager process_manager.ExternalWorkers) {
+func startServers(host string, workerCount int, workerManager process_manager.ExternalWorkers) {
 	if prefork.IsChild() {
 		ended := make(chan error)
 
 		go func() {
-			err := server.StartWorkerServer(freePort, workerManager)
+			err := server.StartWorkerServer(workerManager)
 			ended <- err
 		}()
 
@@ -144,4 +150,15 @@ func getFreePort() (int, error) {
 	}
 	defer l.Close()
 	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
+// Random Auth generation
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func randStringBytes(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
 }

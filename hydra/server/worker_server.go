@@ -28,12 +28,12 @@ var (
 	Invokes:
 		- workerHandler()
 */
-func StartWorkerServer(workerPort int, workerManager process_manager.ExternalWorkers) error {
+func StartWorkerServer(workerManager process_manager.ExternalWorkers) error {
 
 	requestHandler := func(ctx *fasthttp.RequestCtx) {
 		switch string(ctx.Path()) {
 		case "/workers":
-			workerHandler(ctx)
+			workerHandler(ctx, workerManager.WorkerAuth)
 		default:
 			ctx.Error("Unsupported path", fasthttp.StatusNotFound)
 		}
@@ -47,7 +47,7 @@ func StartWorkerServer(workerPort int, workerManager process_manager.ExternalWor
 	//}()
 
 	go func() {
-		binding := fmt.Sprintf("127.0.0.1:%v", workerPort)
+		binding := fmt.Sprintf("127.0.0.1:%v", workerManager.ConnectionPort)
 		fmt.Println("Binding to: ", binding)
 		err := fasthttp.ListenAndServe(binding, requestHandler)
 		ended <- err
@@ -56,7 +56,14 @@ func StartWorkerServer(workerPort int, workerManager process_manager.ExternalWor
 	return <-ended
 }
 
-func workerHandler(ctx *fasthttp.RequestCtx) {
+func workerHandler(ctx *fasthttp.RequestCtx, auth string) {
+	reqAuth := string(ctx.Request.Header.Peek("Authorization"))
+	if reqAuth != auth {
+		ctx.SetStatusCode(403)
+		ctx.SetBodyString("Not authorized")
+		return
+	}
+
 	_ = upgrader.Upgrade(ctx, upgradedWebsocket)
 }
 
