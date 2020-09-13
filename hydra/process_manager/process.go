@@ -68,32 +68,11 @@ func (ew *ExternalWorkers) StartExternalWorkers() {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	var exitedProcs int
-	for sig := range sigCh {
-		delete(activeProcs, sig.pid)
+	sig := <-sigCh
+	delete(activeProcs, sig.pid)
 
-		log.Printf(
-			"one of the worker processes exited with error: %v", sig.err)
-
-		if exitedProcs++; exitedProcs > ew.recoveryAllowance {
-			log.Printf("worker processes exit too many times, "+
-				"which exceeds the value of RecoverThreshold(%d), "+
-				"exiting the server process.\n", exitedProcs)
-			err = ErrOverRecovery
-			break
-		}
-
-		var cmd *exec.Cmd
-		if cmd, err = ew.doCommand(); err != nil {
-			break
-		}
-
-		activeProcs[cmd.Process.Pid] = cmd
-		go func() {
-			sigCh <- workerSig{cmd.Process.Pid, cmd.Wait()}
-		}()
-	}
-
+	log.Printf(
+		"one of the worker processes exited with error: %v", sig.err)
 	return
 }
 

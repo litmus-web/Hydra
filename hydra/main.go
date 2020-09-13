@@ -99,7 +99,7 @@ func main() {
 		WorkerAuth:     "",
 	}
 
-	startServers(*host, free, *workerCount, manager)
+	startServers(*host, *workerCount, free, manager)
 }
 
 // Starts the main servers, it will only start worker servers if
@@ -107,9 +107,28 @@ func main() {
 // process management and does not connect to a socket.
 func startServers(host string, workerCount int, freePort int, workerManager process_manager.ExternalWorkers) {
 	if prefork.IsChild() {
-		go server.StartWorkerServer(freePort, workerManager)
+		ended := make(chan error)
+
+		go func() {
+			err := server.StartWorkerServer(freePort, workerManager)
+			ended <- err
+		}()
+
+		go func() {
+			server.StartMainServer(host, workerCount)
+			ended <- nil
+		}()
+
+		err := <-ended
+
+		if err != nil {
+			log.Fatalln(err)
+		}
+		log.Println("Shutting down server...")
+
+	} else {
+		server.StartMainServer(host, workerCount)
 	}
-	server.StartMainServer(host, workerCount)
 }
 
 // Produces a free port from polling the OS.
