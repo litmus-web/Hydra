@@ -11,13 +11,16 @@ import (
 )
 
 var (
+	nextShard      chan uint64
 	nextResponseId uint64 = 0
-	countPool             = sync.Pool{
+
+	countPool = sync.Pool{
 		New: func() interface{} {
 			atomic.AddUint64(&nextResponseId, 1)
 			newId := nextResponseId
 			return RequestPack{
 				ReqId:       newId,
+				ShardId:     <-nextShard,
 				RecvChannel: make(chan IncomingResponse),
 				ModRequest: OutgoingRequest{
 					Op:        1,
@@ -27,6 +30,24 @@ var (
 		},
 	}
 )
+
+func init() {
+	nextShard = make(chan uint64)
+	go func() {
+		var totalLength uint64
+		var counter uint64 = 1
+		for {
+			totalLength = uint64(shardManager.Shards.Len())
+			if counter > totalLength {
+				counter = 1
+			}
+
+			nextShard <- counter
+
+			counter += 1
+		}
+	}()
+}
 
 /*
 	startMainServer (public) starts the pre-forking FastHTTP server binding to the
@@ -77,14 +98,12 @@ func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
 	reqHelper.ModRequest.Body = ""
 	reqHelper.ModRequest.Query = ctx.QueryArgs().String()
 
-	var shardId uint64
-	shardId = 1
-
-	exists := shardManager.SubmitToShard(shardId, &reqHelper.ModRequest, reqHelper.RecvChannel)
+	exists := shardManager.SubmitToShard(reqHelper.ShardId, &reqHelper.ModRequest, reqHelper.RecvChannel)
 
 	if !exists {
 		ctx.SetStatusCode(503)
-		_, _ = fmt.Fprintf(ctx, "Internal Server error: Shard with Id: %v does not exist.", shardId)
+		_, _ = fmt.Fprintf(
+			ctx, "Internal Server error: Shard with Id: %v does not exist.", &reqHelper.ShardId)
 		return
 	}
 

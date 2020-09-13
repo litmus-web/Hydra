@@ -48,7 +48,6 @@ func StartWorkerServer(workerManager process_manager.ExternalWorkers) error {
 
 	go func() {
 		binding := fmt.Sprintf("127.0.0.1:%v", workerManager.ConnectionPort)
-		fmt.Println("Binding to: ", binding)
 		err := fasthttp.ListenAndServe(binding, requestHandler)
 		ended <- err
 	}()

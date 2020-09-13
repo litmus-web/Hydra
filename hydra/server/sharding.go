@@ -10,7 +10,7 @@ var shardManager ShardManager
 
 func init() {
 	shardManager = ShardManager{
-		shards: &hashmap.HashMap{},
+		Shards: &hashmap.HashMap{},
 	}
 }
 
@@ -19,7 +19,7 @@ func init() {
 	shard related IO and control.
 */
 type ShardManager struct {
-	shards *hashmap.HashMap // map[uint64]*Shard
+	Shards *hashmap.HashMap // map[uint64]*Shard
 }
 
 /*
@@ -27,7 +27,7 @@ type ShardManager struct {
 	later on down the line of development.
 */
 func (sm *ShardManager) AddShard(shard *Shard) {
-	sm.shards.Set(shard.ShardId, shard)
+	sm.Shards.Set(shard.ShardId, shard)
 }
 
 /*
@@ -35,7 +35,7 @@ func (sm *ShardManager) AddShard(shard *Shard) {
 	therefore removing it from the web server's usage.
 */
 func (sm *ShardManager) RemoveShard(shardId uint64) {
-	sm.shards.Del(shardId)
+	sm.Shards.Del(shardId)
 }
 
 /*
@@ -44,7 +44,7 @@ func (sm *ShardManager) RemoveShard(shardId uint64) {
 	signal if the shard exists and has been sent the data or not.
 */
 func (sm *ShardManager) SubmitToShard(shardId uint64, out *OutgoingRequest, recv chan IncomingResponse) bool {
-	s, ok := sm.shards.Get(shardId)
+	s, ok := sm.Shards.Get(shardId)
 	if !ok {
 		return false
 	}

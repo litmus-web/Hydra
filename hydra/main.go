@@ -34,7 +34,7 @@ var (
 		"shardsperproc", 1, "The amount of shards per process to use.")
 
 	processRatio = flag.Int(
-		"extprocs", 1, "The amount of external workers to spawn to 1 Go worker.")
+		"procratio", 1, "The amount of external workers to spawn to 1 Go worker.")
 
 	// Fast Http Settings
 

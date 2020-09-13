@@ -60,6 +60,7 @@ type IncomingMetadata struct {
 */
 type RequestPack struct {
 	ReqId       uint64
+	ShardId     uint64
 	RecvChannel chan IncomingResponse
 	ModRequest  OutgoingRequest
 }
