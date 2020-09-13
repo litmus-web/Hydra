@@ -4,8 +4,10 @@ import (
 	"flag"
 	"log"
 	"net"
+	"strings"
 
 	"./prefork"
+	"./process_manager"
 	"./server"
 )
 
@@ -17,14 +19,23 @@ var (
 		"app", "", "The WSGI, ASGI or raw app name and path, e.g 'my_server:app'")
 	adapter = flag.String(
 		"adapter", "", "Adapter type to use. (ASGI, WSGI, RAW)")
-	shardsPerProc = flag.Int(
-		"shardsperproc", 1, "The amount of shards per process to use.")
-	processRatio = flag.Int(
-		"extprocs", 1, "The amount of external workers to spawn to 1 Go worker.")
 	workerCount = flag.Int(
 		"workers", 1, "The amount of server workers to spawn.")
 
+	// External process options
+	workerCommand = flag.String(
+		"workercmd",
+		"python",
+		"The command to be used to start a external worker. e.g. 'python'")
+
+	shardsPerProc = flag.Int(
+		"shardsperproc", 1, "The amount of shards per process to use.")
+
+	processRatio = flag.Int(
+		"extprocs", 1, "The amount of external workers to spawn to 1 Go worker.")
+
 	// Fast Http Settings
+
 	//name = flag.String(
 	//"name", "Sandman", "Server name")
 	//concurrency = flag.Int(
@@ -61,19 +72,42 @@ func main() {
 		log.Fatalln("--adapter is a required flag, e.g 'asgi'")
 	}
 
+	var targetFile string
+	splitString := strings.Split(*app, ":")
+	if len(splitString) == 2 {
+		targetFile = splitString[0]
+	} else {
+		log.Printf(
+			"Cannot split %v into file and object parts, "+
+				"make sure the format is `file:object` e.g. `my_file:app`", *app)
+		return
+	}
+
 	free, err := getFreePort()
 	if err != nil {
 		log.Fatalln(err)
 	}
-	startServers(*host, free, *workerCount)
+
+	manager := process_manager.ExternalWorkers{
+		RunnerCall:     *workerCommand,
+		TargetFile:     targetFile,
+		App:            *app,
+		Adapter:        *adapter,
+		ConnectionPort: free,
+		WorkerCount:    *processRatio,
+		ShardsPerProc:  *shardsPerProc,
+		WorkerAuth:     "",
+	}
+
+	startServers(*host, free, *workerCount, manager)
 }
 
 // Starts the main servers, it will only start worker servers if
 // the process is a child because the main thread is used for
 // process management and does not connect to a socket.
-func startServers(host string, freePort int, workerCount int) {
+func startServers(host string, workerCount int, freePort int, workerManager process_manager.ExternalWorkers) {
 	if prefork.IsChild() {
-		go server.StartWorkerServer(freePort)
+		go server.StartWorkerServer(freePort, workerManager)
 	}
 	server.StartMainServer(host, workerCount)
 }

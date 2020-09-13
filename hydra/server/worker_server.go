@@ -2,11 +2,14 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"sync/atomic"
 
 	"github.com/cornelk/hashmap"
 	"github.com/fasthttp/websocket"
 	"github.com/valyala/fasthttp"
+
+	"../process_manager"
 )
 
 var (
@@ -18,7 +21,7 @@ var (
 	}
 )
 
-func StartWorkerServer(workerPort int) {
+func StartWorkerServer(workerPort int, workerManager process_manager.ExternalWorkers) {
 	/*
 		startWorkerServer is internal server that is reserved just for worker
 		processes, and the only entry point is via `ws://127.0.0.1:workerPort/workers`
@@ -36,10 +39,23 @@ func StartWorkerServer(workerPort int) {
 		}
 	}
 
-	binding := fmt.Sprintf("127.0.0.1:%v", workerPort)
-	fmt.Println("Binding to: ", binding)
-	if err := fasthttp.ListenAndServe(binding, requestHandler); err != nil {
-		panic(err)
+	ended := make(chan error)
+
+	go func() {
+		workerManager.StartExternalWorkers()
+		ended <- nil
+	}()
+
+	go func() {
+		binding := fmt.Sprintf("127.0.0.1:%v", workerPort)
+		fmt.Println("Binding to: ", binding)
+		err := fasthttp.ListenAndServe(binding, requestHandler)
+		ended <- err
+	}()
+
+	err := <-ended
+	if err != nil {
+		log.Fatalln(err)
 	}
 }
 
