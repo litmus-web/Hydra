@@ -31,6 +31,10 @@ var (
 	}
 )
 
+const (
+	maxContentLength int = 1
+)
+
 func init() {
 	nextShard = make(chan uint64)
 	go func() {
@@ -102,7 +106,7 @@ func anyHTTPHandler(ctx *fasthttp.RequestCtx) {
 	reqHelper.ModRequest.Remote = ctx.RemoteAddr().String()
 	reqHelper.ModRequest.Path = string(ctx.Path())
 	reqHelper.ModRequest.Version = "HTTP/1.1"
-	reqHelper.ModRequest.Body = ""
+	reqHelper.ModRequest.Body = &ctx.Request
 	reqHelper.ModRequest.Query = ctx.QueryArgs().String()
 
 	exists := shardManager.SubmitToShard(reqHelper.ShardId, &reqHelper.ModRequest, reqHelper.RecvChannel)

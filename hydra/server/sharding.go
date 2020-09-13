@@ -101,6 +101,7 @@ func (s *Shard) Start() {
 */
 func (s *Shard) handleWrite() {
 	var outgoing *OutgoingRequest
+
 	for outgoing = range s.OutgoingChannel {
 		_ = s.conn.WriteJSON(outgoing)
 	}
