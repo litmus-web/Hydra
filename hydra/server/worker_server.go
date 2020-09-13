@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"log"
 	"sync/atomic"
 
 	"github.com/cornelk/hashmap"
@@ -29,7 +28,7 @@ var (
 	Invokes:
 		- workerHandler()
 */
-func StartWorkerServer(workerPort int, workerManager process_manager.ExternalWorkers) {
+func StartWorkerServer(workerPort int, workerManager process_manager.ExternalWorkers) error {
 
 	requestHandler := func(ctx *fasthttp.RequestCtx) {
 		switch string(ctx.Path()) {
@@ -56,8 +55,9 @@ func StartWorkerServer(workerPort int, workerManager process_manager.ExternalWor
 
 	err := <-ended
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
+	return nil
 }
 
 func workerHandler(ctx *fasthttp.RequestCtx) {
