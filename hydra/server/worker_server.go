@@ -41,10 +41,10 @@ func StartWorkerServer(workerPort int, workerManager process_manager.ExternalWor
 
 	ended := make(chan error)
 
-	go func() {
-		workerManager.StartExternalWorkers()
-		ended <- nil
-	}()
+	//go func() {
+	//		workerManager.StartExternalWorkers()
+	//		ended <- nil
+	//}()
 
 	go func() {
 		binding := fmt.Sprintf("127.0.0.1:%v", workerPort)
@@ -53,11 +53,7 @@ func StartWorkerServer(workerPort int, workerManager process_manager.ExternalWor
 		ended <- err
 	}()
 
-	err := <-ended
-	if err != nil {
-		return err
-	}
-	return nil
+	return <-ended
 }
 
 func workerHandler(ctx *fasthttp.RequestCtx) {
