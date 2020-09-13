@@ -135,5 +135,9 @@ func formatArgs(flagPairs ...[]string) []string {
 
 func toString(flag string, v interface{}) []string {
 	var temp []string
-	return append(temp, flag, fmt.Sprintf("%v", v))
+	formatted := fmt.Sprintf("%v", v)
+	if formatted != "" {
+		return append(temp, flag, formatted)
+	}
+	return append(temp, flag)
 }
