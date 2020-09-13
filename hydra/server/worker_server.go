@@ -26,14 +26,14 @@ var (
 	anything else is ignored and returns a 403 or method not allowed.
 
 	Invokes:
-		- workerHandler()
+		- authorizeAndUpgrade()
 */
 func StartWorkerServer(workerManager process_manager.ExternalWorkers) error {
 
 	requestHandler := func(ctx *fasthttp.RequestCtx) {
 		switch string(ctx.Path()) {
 		case "/workers":
-			workerHandler(ctx, workerManager.WorkerAuth)
+			authorizeAndUpgrade(ctx, workerManager.WorkerAuth)
 		default:
 			ctx.Error("Unsupported path", fasthttp.StatusNotFound)
 		}
@@ -56,7 +56,7 @@ func StartWorkerServer(workerManager process_manager.ExternalWorkers) error {
 	return <-ended
 }
 
-func workerHandler(ctx *fasthttp.RequestCtx, auth string) {
+func authorizeAndUpgrade(ctx *fasthttp.RequestCtx, auth string) {
 	reqAuth := string(ctx.Request.Header.Peek("Authorization"))
 	if reqAuth != auth {
 		ctx.SetStatusCode(403)
