@@ -17,8 +17,10 @@ var (
 		"app", "", "The WSGI, ASGI or raw app name and path, e.g 'my_server:app'")
 	adapter = flag.String(
 		"adapter", "", "Adapter type to use. (ASGI, WSGI, RAW)")
-	//shardsPerProc = flag.Int(
-	//	"shardsperproc", 1, "The amount of shards per process to use.")
+	shardsPerProc = flag.Int(
+		"shardsperproc", 1, "The amount of shards per process to use.")
+	processRatio = flag.Int(
+		"extprocs", 1, "The amount of external workers to spawn to 1 Go worker.")
 	workerCount = flag.Int(
 		"workers", 1, "The amount of server workers to spawn.")
 
