@@ -14,18 +14,22 @@ import (
 var ErrOverRecovery = errors.New("exceeding the value of RecoverThreshold")
 
 type ExternalWorkers struct {
+	// The thing to execute code, this lets us customise calls, e.g. py xyz.py
 	RunnerCall string
+
 	TargetFile string
 
-	App            string
-	Adapter        string
-	ConnectionPort int
+	App            string // the file:app string
+	Adapter        string // The python adapter for frameworks
+	ConnectionPort int    // The unique port assigned
 
-	WorkerCount   int
-	ShardsPerProc int
+	WorkerCount   int // Amount of actual processes
+	ShardsPerProc int // Amount of ws connections
 
+	// The secure string to allow the worker to actually connect
 	WorkerAuth string
 
+	// The amount of times a process is able to restart from
 	recoveryAllowance int
 }
 
