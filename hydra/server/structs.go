@@ -8,15 +8,15 @@ package server
 	else over complicated.
 */
 type OutgoingRequest struct {
-	Op        int    `json:"op"`
-	RequestId uint64 `json:"request_id"`
-	Method    string `json:"method"`
-	Remote    string `json:"remote"`
-	Path      string `json:"path"`
-	Headers   string `json:"headers"`
-	Version   string `json:"version"`
-	Body      string `json:"body"`
-	Query     string `json:"query"`
+	Op        int        `json:"op"`
+	RequestId uint64     `json:"request_id"`
+	Method    string     `json:"method"`
+	Remote    string     `json:"remote"`
+	Path      string     `json:"path"`
+	Headers   [][]string `json:"headers"`
+	Version   string     `json:"version"`
+	Body      string     `json:"body"`
+	Query     string     `json:"query"`
 }
 
 /*

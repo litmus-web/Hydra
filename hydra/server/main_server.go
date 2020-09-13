@@ -69,8 +69,16 @@ func StartMainServer(mainHost string, workerCount int) {
 	}
 }
 
-func parseHeaders(ctx *fasthttp.RequestCtx) string {
-	return ctx.Request.Header.String()
+func parseHeaders(ctx *fasthttp.RequestCtx) [][]string {
+	var headers [][]string
+	var part []string
+
+	callback := func(k []byte, v []byte) {
+		headers = append(headers, append(part, string(k), string(v)))
+	}
+	ctx.Request.Header.VisitAll(callback)
+
+	return headers
 }
 
 /*
