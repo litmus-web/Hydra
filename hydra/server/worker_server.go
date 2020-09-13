@@ -21,15 +21,16 @@ var (
 	}
 )
 
-func StartWorkerServer(workerPort int, workerManager process_manager.ExternalWorkers) {
-	/*
-		startWorkerServer is internal server that is reserved just for worker
-		processes, and the only entry point is via `ws://127.0.0.1:workerPort/workers`
-		anything else is ignored and returns a 403 or method not allowed.
+/*
+	startWorkerServer is internal server that is reserved just for worker
+	processes, and the only entry point is via `ws://127.0.0.1:workerPort/workers`
+	anything else is ignored and returns a 403 or method not allowed.
 
-		Invokes:
-			- workerHandler()
-	*/
+	Invokes:
+		- workerHandler()
+*/
+func StartWorkerServer(workerPort int, workerManager process_manager.ExternalWorkers) {
+
 	requestHandler := func(ctx *fasthttp.RequestCtx) {
 		switch string(ctx.Path()) {
 		case "/workers":
