@@ -20,28 +20,29 @@ Hydra has a main server (acting in place of Nginx or Apache but can operate behi
 ## How well does it perform?
 Although i have only done testing benchmarks the results are promising! On a windows system Hydra averages a **125%** requests/sec increase when benching against [Uvicorn](https://www.uvicorn.org/), Although this is windows and nothing is ever as good as it could be :P
 
-On linux the last tests we did we averaged about a **30%** request/sec increase with [Uvicorn](https://www.uvicorn.org/) running with Uvloop and Hydra running on pure python with zero speed ups (Hydra is based off of AyncIO and would also benifit heavily from AioHTTP's speedups option and uvloop installs).
+On linux the last tests we did we averaged about a **35%** request/sec increase with [Uvicorn](https://www.uvicorn.org/) running with Uvloop and Hydra running on pure python with zero speed ups (Hydra is based off of AyncIO and would also benifit heavily from AioHTTP's speedups option and uvloop installs).
 
 
-**These are the following results when tested with Wrk on windows, take this with a pinch of salt because there are some massive bottleknecks here.**
+**These are the following results when tested with Wrk on linux**
 ```docker
-============= Hydra =============
- Running 2m test @ http://127.0.0.1:5000/
-   2 threads and 256 connections
-   Thread Stats   Avg      Stdev     Max   +/- Stdev
-     Latency    31.78ms   40.64ms   1.16s    95.92%
-     Req/Sec     4.88k     0.86k    6.33k    87.94%
-   1163658 requests in 2.00m, 163.13MB read
- Requests/sec:   9691.59
- Transfer/sec:      1.36MB
- 
-============= Uvicorn =============
- Running 2m test @ http://127.0.0.1:5050/
-   2 threads and 256 connections
-   Thread Stats   Avg      Stdev     Max   +/- Stdev
-     Latency    64.69ms   37.38ms 880.21ms   96.23%
-     Req/Sec     2.11k   386.98     2.52k    91.68%
-   502029 requests in 2.00m, 71.84MB read
- Requests/sec:   4181.81
- Transfer/sec:    612.77KB
+wrk_test   | Starting Benchmark...
+wrk_test   | ============= Hydra =============
+wrk_test   | Running 25s test @ http://server:8080/
+wrk_test   |   2 threads and 256 connections
+wrk_test   |   Thread Stats   Avg      Stdev     Max   +/- Stdev
+wrk_test   |     Latency     9.44ms    2.95ms 215.79ms   88.88%
+wrk_test   |     Req/Sec    13.67k   841.55    15.01k    80.00%
+wrk_test   |   680155 requests in 25.03s, 103.78MB read
+wrk_test   | Requests/sec:  27169.62
+wrk_test   | Transfer/sec:      4.15MB
+wrk_test   | ============= Uvicorn =============
+wrk_test   | Running 25s test @ http://uvicorn:5000/
+wrk_test   |   2 threads and 256 connections
+wrk_test   |   Thread Stats   Avg      Stdev     Max   +/- Stdev
+wrk_test   |     Latency    13.48ms  764.26us  35.89ms   93.62%
+wrk_test   |     Req/Sec     9.52k   529.57    10.34k    58.40%
+wrk_test   |   474090 requests in 25.04s, 67.82MB read
+wrk_test   | Requests/sec:  18931.54
+wrk_test   | Transfer/sec:      2.71MB
+wrk_test   | Round 1 |  Sandman:  Requests/sec:  27169.62  Req/Sec         Round 1 |  Uvicorn:  Requests/sec:  18931.54  Req/Sec
 ```
