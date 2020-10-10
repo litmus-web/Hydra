@@ -46,3 +46,7 @@ wrk_test   | Requests/sec:  18931.54
 wrk_test   | Transfer/sec:      2.71MB
 wrk_test   | Round 1 |  Sandman:  Requests/sec:  27169.62  Req/Sec         Round 1 |  Uvicorn:  Requests/sec:  18931.54  Req/Sec
 ```
+
+## Current Issues:
+- Unfinished 
+- Multi process scaling has benched on docker as not being linear causing stability issues. 2+ workers can cause some concerning performance drops
